@@ -24,38 +24,85 @@ export const db = getFirestore(app);
 
 const COLLECTION = 'pings';
 
-// Request Notification Permission on Browser / iOS Safari
+// Web Audio API Chime Generator (Guaranteed sound on all browsers)
+export function playChimeSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12); // A5
+    osc.frequency.exponentialRampToValueAtTime(1174.66, ctx.currentTime + 0.28); // D6
+
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.55);
+  } catch (e) {
+    console.log('Audio chime note:', e);
+  }
+}
+
+// Request Notification Permission
 export async function requestNotificationPermission() {
   if ('Notification' in window) {
-    const perm = await Notification.requestPermission();
-    return perm === 'granted';
+    try {
+      const perm = await Notification.requestPermission();
+      return perm === 'granted';
+    } catch (e) {
+      return false;
+    }
   }
   return false;
 }
 
-// Show a system notification (works in iOS Safari when installed to home screen & Android/PC)
-export function showSystemNotification(title, body, icon = '🦢') {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.ready.then((reg) => {
-        reg.showNotification(title, {
-          body,
-          icon: '/bubulink-web/icon-192.png',
-          badge: '/bubulink-web/icon-192.png',
-          vibrate: [200, 100, 200],
-        });
-      });
-    } else {
-      new Notification(title, {
-        body,
-        icon: '/bubulink-web/icon-192.png',
-      });
-    }
+// Show guaranteed notification (System Push + In-App Toast Banner + Audio Chime + Haptics)
+export function showSystemNotification(title, body) {
+  // 1. Play Sound & Haptics immediately
+  playChimeSound();
+  if (navigator.vibrate) {
+    navigator.vibrate([200, 100, 200]);
   }
 
-  // Also trigger haptic vibration if supported
-  if (navigator.vibrate) {
-    navigator.vibrate([100, 50, 100]);
+  // 2. Dispatch custom in-app floating banner event
+  window.dispatchEvent(
+    new CustomEvent('bubulink_alert', {
+      detail: { title, body }
+    })
+  );
+
+  // 3. Trigger OS / Lock-screen notification
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then((reg) => {
+          reg.showNotification(title, {
+            body,
+            icon: './icon-192.png',
+            badge: './icon-192.png',
+            vibrate: [200, 100, 200],
+            requireInteraction: true,
+          });
+        }).catch(() => {
+          try {
+            new Notification(title, { body, icon: './icon-192.png' });
+          } catch (_) {}
+        });
+      } else {
+        new Notification(title, { body, icon: './icon-192.png' });
+      }
+    } catch (e) {
+      console.log('Native notification fallback:', e);
+    }
   }
 }
 

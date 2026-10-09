@@ -9,14 +9,16 @@ import {
   RefreshCw, 
   Smartphone,
   Flame,
-  Volume2
+  Volume2,
+  X
 } from 'lucide-react';
 import { 
   sendPingToFirestore, 
   reactToPingInFirestore, 
   subscribeToPings, 
   requestNotificationPermission, 
-  showSystemNotification 
+  showSystemNotification,
+  playChimeSound
 } from './firebase';
 
 const QUICK_TAGS = [
@@ -45,6 +47,7 @@ export default function App() {
   const [isSending, setIsSending] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [activeModalPing, setActiveModalPing] = useState(null);
+  const [toastAlert, setToastAlert] = useState(null);
   
   const lastPingIdRef = useRef(null);
   const lastReactionRef = useRef(null);
@@ -54,6 +57,18 @@ export default function App() {
     if ('Notification' in window && Notification.permission === 'granted') {
       setNotifGranted(true);
     }
+
+    // Listen to custom in-app floating banner alerts
+    const handleAlert = (e) => {
+      const { title, body } = e.detail;
+      setToastAlert({ title, body, id: Date.now() });
+      setTimeout(() => {
+        setToastAlert(null);
+      }, 5000);
+    };
+
+    window.addEventListener('bubulink_alert', handleAlert);
+    return () => window.removeEventListener('bubulink_alert', handleAlert);
   }, []);
 
   // Subscribe to real-time Firestore pings
@@ -63,7 +78,7 @@ export default function App() {
         const top = list[0];
         const currentRole = localStorage.getItem('bubulink_role');
 
-        // If I am Arnav and Zenah sent a new ping -> Notify me!
+        // 🔔 If I am Arnav and Zenah sent a new ping -> Notify me!
         if (currentRole === 'arnav' && top.sender === 'zenah') {
           if (lastPingIdRef.current && lastPingIdRef.current !== top.id) {
             showSystemNotification(
@@ -74,7 +89,7 @@ export default function App() {
           lastPingIdRef.current = top.id;
         }
 
-        // If I am Zenah and Arnav replied -> Notify me!
+        // 🔔 If I am Zenah and Arnav replied -> Notify me!
         if (currentRole === 'zenah' && top.reaction) {
           const reactionKey = `${top.id}_${top.reaction}`;
           if (lastReactionRef.current && lastReactionRef.current !== reactionKey) {
@@ -96,7 +111,7 @@ export default function App() {
     localStorage.setItem('bubulink_role', selectedRole);
     setRole(selectedRole);
     setShowRoleModal(false);
-    // Auto request notification on role select
+    playChimeSound();
     const granted = await requestNotificationPermission();
     setNotifGranted(granted);
   };
@@ -104,9 +119,8 @@ export default function App() {
   const handleEnableNotifs = async () => {
     const granted = await requestNotificationPermission();
     setNotifGranted(granted);
-    if (granted) {
-      showSystemNotification('🔔 Notifications Enabled!', 'You will now receive instant cute pings from your partner.');
-    }
+    playChimeSound();
+    showSystemNotification('🔔 Alerts Active!', 'You will now receive sound & popup alerts on every ping.');
   };
 
   // Zenah sends cute ping
@@ -234,6 +248,18 @@ export default function App() {
 
   return (
     <div className="app-container">
+      {/* Floating Drop-down Toast Notification */}
+      {toastAlert && (
+        <div className="toast-floating-banner animate-bounce-in" onClick={() => setToastAlert(null)}>
+          <div className="toast-icon">⚡</div>
+          <div className="toast-text">
+            <strong>{toastAlert.title}</strong>
+            <p>{toastAlert.body}</p>
+          </div>
+          <button className="toast-close"><X size={14} /></button>
+        </div>
+      )}
+
       {/* Top Header Bar */}
       <header className="app-header">
         <div className="user-profile-row">
@@ -251,12 +277,10 @@ export default function App() {
         </div>
 
         <div className="header-actions">
-          {!notifGranted && (
-            <button className="notif-btn" onClick={handleEnableNotifs} title="Enable Push Notifications">
-              <Bell size={16} />
-              <span>Enable Alerts</span>
-            </button>
-          )}
+          <button className="notif-btn" onClick={handleEnableNotifs} title="Enable Alerts">
+            <Bell size={15} />
+            <span>{notifGranted ? 'Sound ON' : 'Enable Alerts'}</span>
+          </button>
           <button 
             className="switch-role-btn" 
             onClick={() => setShowRoleModal(true)}
@@ -368,7 +392,7 @@ export default function App() {
                 <span className="sim-icon">🧪</span>
                 <div>
                   <h4>Test Real-time Ping + Alert</h4>
-                  <p>Fires a real system notification banner and writes to cloud</p>
+                  <p>Fires real sound chime, system banner and writes to cloud</p>
                 </div>
               </div>
               <button className="simulate-btn" onClick={handleSimulatePing}>
