@@ -24,7 +24,22 @@ export const db = getFirestore(app);
 
 const COLLECTION = 'pings';
 
-// Web Audio API Chime Generator (Guaranteed sound on all browsers)
+// Your VPS Push Endpoint & Public VAPID Key
+const VPS_API_BASE = 'https://arnavcloud.co.in/bubulink-api';
+const PUBLIC_VAPID_KEY = 'BIGU4TdmKPx9RsHIzMBE6TnX0DE-749m07zGeIXT_ZROr89gTAyjT8BovtUjRWsRmAv8wZiDER4tcBN0-7FcJQ0';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// Web Audio API Chime Generator
 export function playChimeSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -47,70 +62,93 @@ export function playChimeSound() {
 
     osc.start();
     osc.stop(ctx.currentTime + 0.55);
-  } catch (e) {
-    console.log('Audio chime note:', e);
-  }
+  } catch (e) {}
 }
 
-// Request Notification Permission
-export async function requestNotificationPermission() {
-  if ('Notification' in window) {
-    try {
-      const perm = await Notification.requestPermission();
-      return perm === 'granted';
-    } catch (e) {
-      return false;
+// Request Notification Permission and register with VPS Web Push
+export async function registerPushWithVPS(role) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.log('Push messaging is not supported on this browser/environment');
+    return false;
+  }
+
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return false;
+
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      const convertedVapidKey = urlBase64ToUint8Array(PUBLIC_VAPID_KEY);
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertedVapidKey,
+      });
     }
+
+    // Send subscription to VPS backend
+    await fetch(`${VPS_API_BASE}/api/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        role,
+        subscription,
+      }),
+    });
+
+    console.log(`✅ Push subscription registered with VPS for role: ${role}`);
+    return true;
+  } catch (err) {
+    console.warn('Push registration note:', err);
+    return false;
   }
-  return false;
 }
 
-// Show guaranteed notification (System Push + In-App Toast Banner + Audio Chime + Haptics)
+// Dispatch Apple Web Push via VPS to partner
+export async function dispatchVPSPush(targetRole, title, body) {
+  try {
+    await fetch(`${VPS_API_BASE}/api/push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        targetRole,
+        title,
+        body,
+      }),
+    });
+    console.log(`⚡ Dispatched push to ${targetRole} via VPS`);
+  } catch (err) {
+    console.warn('VPS push dispatch note:', err);
+  }
+}
+
+// Show in-app toast / banner + sound
 export function showSystemNotification(title, body) {
-  // 1. Play Sound & Haptics immediately
   playChimeSound();
   if (navigator.vibrate) {
     navigator.vibrate([200, 100, 200]);
   }
 
-  // 2. Dispatch custom in-app floating banner event
   window.dispatchEvent(
     new CustomEvent('bubulink_alert', {
       detail: { title, body }
     })
   );
-
-  // 3. Trigger OS / Lock-screen notification
-  if ('Notification' in window && Notification.permission === 'granted') {
-    try {
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.ready.then((reg) => {
-          reg.showNotification(title, {
-            body,
-            icon: './icon-192.png',
-            badge: './icon-192.png',
-            vibrate: [200, 100, 200],
-            requireInteraction: true,
-          });
-        }).catch(() => {
-          try {
-            new Notification(title, { body, icon: './icon-192.png' });
-          } catch (_) {}
-        });
-      } else {
-        new Notification(title, { body, icon: './icon-192.png' });
-      }
-    } catch (e) {
-      console.log('Native notification fallback:', e);
-    }
-  }
 }
 
-// Send a new cute ping to Firestore
+// Send a new cute ping to Firestore & VPS Push
 export async function sendPingToFirestore(ping) {
   try {
     const docRef = doc(db, COLLECTION, ping.id);
     await setDoc(docRef, ping);
+
+    // Also trigger VPS Apple Web Push to Arnav!
+    dispatchVPSPush(
+      'arnav',
+      `🌸 Zenah Spotted Something Cute! (${ping.emoji})`,
+      ping.message
+    );
     return true;
   } catch (err) {
     console.error('Error sending ping to Firestore:', err);
@@ -118,7 +156,7 @@ export async function sendPingToFirestore(ping) {
   }
 }
 
-// React to a ping
+// React to a ping & trigger VPS Push to Zenah
 export async function reactToPingInFirestore(pingId, reaction) {
   try {
     const docRef = doc(db, COLLECTION, pingId);
@@ -126,6 +164,13 @@ export async function reactToPingInFirestore(pingId, reaction) {
       reaction,
       reactionTimestamp: new Date().toISOString(),
     });
+
+    // Also trigger VPS Apple Web Push to Zenah!
+    dispatchVPSPush(
+      'zenah',
+      '💖 Arnav Replied to Your Ping!',
+      `Your husband reacted: ${reaction}`
+    );
     return true;
   } catch (err) {
     console.error('Error reacting in Firestore:', err);
@@ -141,7 +186,6 @@ export function subscribeToPings(callback) {
     snapshot.forEach((doc) => {
       list.push({ id: doc.id, ...doc.data() });
     });
-    // Sort in memory by timestamp descending
     list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     callback(list);
   }, (err) => {

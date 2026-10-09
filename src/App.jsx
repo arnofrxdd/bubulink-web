@@ -16,9 +16,9 @@ import {
   sendPingToFirestore, 
   reactToPingInFirestore, 
   subscribeToPings, 
-  requestNotificationPermission, 
   showSystemNotification,
-  playChimeSound
+  playChimeSound,
+  registerPushWithVPS
 } from './firebase';
 
 const QUICK_TAGS = [
@@ -107,20 +107,32 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const currentRole = localStorage.getItem('bubulink_role');
+    if (currentRole) {
+      registerPushWithVPS(currentRole).then((granted) => {
+        if (granted) setNotifGranted(true);
+      });
+    }
+  }, [role]);
+
   const handleSelectRole = async (selectedRole) => {
     localStorage.setItem('bubulink_role', selectedRole);
     setRole(selectedRole);
     setShowRoleModal(false);
     playChimeSound();
-    const granted = await requestNotificationPermission();
+    const granted = await registerPushWithVPS(selectedRole);
     setNotifGranted(granted);
   };
 
   const handleEnableNotifs = async () => {
-    const granted = await requestNotificationPermission();
-    setNotifGranted(granted);
     playChimeSound();
-    showSystemNotification('🔔 Alerts Active!', 'You will now receive sound & popup alerts on every ping.');
+    const currentRole = localStorage.getItem('bubulink_role') || role || 'arnav';
+    const granted = await registerPushWithVPS(currentRole);
+    setNotifGranted(granted);
+    if (granted) {
+      showSystemNotification('🔔 VPS Alerts Active!', 'Your phone is connected to your VPS for Apple lock-screen push!');
+    }
   };
 
   // Zenah sends cute ping
