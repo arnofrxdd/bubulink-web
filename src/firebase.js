@@ -25,7 +25,7 @@ export const db = getFirestore(app);
 const COLLECTION = 'pings';
 
 // Your VPS Push Endpoint & Public VAPID Key
-const VPS_API_BASE = 'https://arnavcloud.co.in/bubulink-api';
+const VPS_API_BASE = 'https://bubu.arnavcloud.co.in';
 const PUBLIC_VAPID_KEY = 'BIGU4TdmKPx9RsHIzMBE6TnX0DE-749m07zGeIXT_ZROr89gTAyjT8BovtUjRWsRmAv8wZiDER4tcBN0-7FcJQ0';
 
 function urlBase64ToUint8Array(base64String) {
