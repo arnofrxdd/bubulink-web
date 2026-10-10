@@ -32,37 +32,37 @@ const VIBE_OPTIONS = [
     id: 'thinking', 
     emoji: '💖', 
     label: 'Thinking of You', 
-    msg: "Just wanted to remind you how deeply I love you. You're always on my mind ❤️" 
+    msg: "Thinking of you ❤️" 
   },
   { 
     id: 'missing', 
     emoji: '🥺', 
     label: 'Missing You', 
-    msg: "Missing your warmth, your voice, and holding you close to me right now." 
+    msg: "Missing you so much right now." 
   },
   { 
     id: 'hug', 
     emoji: '🫂', 
     label: 'Need a Hug', 
-    msg: "Sending you the warmest, tightest hug. Wish I could hold you in my arms right now." 
+    msg: "Sending you the biggest hug." 
   },
   { 
     id: 'call', 
     emoji: '📞', 
     label: 'Call Me Soon', 
-    msg: "Call me whenever you're free, I'd love to hear your voice." 
+    msg: "Call me when you're free!" 
   },
   { 
     id: 'night', 
     emoji: '🌙', 
     label: 'Goodnight', 
-    msg: "Goodnight my love. Rest peacefully, you're the last thing on my mind tonight 🌙❤️" 
+    msg: "Goodnight my love 🌙❤️" 
   },
   { 
     id: 'morning', 
     emoji: '☀️', 
     label: 'Good Morning', 
-    msg: "Good morning sunshine! Hope your day is as bright and lovely as you are ☀️🌸" 
+    msg: "Good morning sunshine ☀️" 
   },
 ];
 
@@ -676,28 +676,24 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= CENTER STAGE: SCULPTED 3D HEART & CIRCULAR RADIAL RING ================= */}
+      {/* ================= CENTER STAGE: MINIMAL ICONIC HEART ================= */}
       <div className="center-stage">
         
-        {/* Apple Circular Radial Vibe Ring & Preview Card */}
+        {/* Minimal Vibe Preview & Radial Orbit */}
         {isHolding && (
           <>
-            {/* Live Message Preview Card (Floats above the circular ring) */}
-            <div className="radial-preview-card animate-spring-up">
-              <span className="preview-emoji">{activeVibe.emoji}</span>
-              <div className="preview-text-block">
-                <strong>{activeVibe.label}</strong>
-                <p>“{activeVibe.msg}”</p>
-              </div>
+            {/* Minimal Clean Label Floating Above */}
+            <div className="minimal-vibe-label animate-fade-in">
+              <span className="vibe-label-text">{activeVibe.label}</span>
             </div>
 
-            {/* Circular Orbiting Vibe Halo */}
+            {/* Clean Orbit Ring */}
             <div className="radial-orbit-ring">
               {VIBE_OPTIONS.map((v, i) => {
                 const isTargeted = selectedVibeIndex === i;
                 const angleDeg = i * 60 - 90;
                 const angleRad = (angleDeg * Math.PI) / 180;
-                const radius = 138;
+                const radius = 132;
                 const x = Math.round(radius * Math.cos(angleRad));
                 const y = Math.round(radius * Math.sin(angleRad));
 
@@ -706,21 +702,18 @@ export default function App() {
                     key={v.id}
                     className={`radial-vibe-orb ${isTargeted ? 'targeted' : ''}`}
                     style={{
-                      transform: `translate(${x}px, ${y}px) scale(${isTargeted ? 1.36 : 1})`,
+                      transform: `translate(${x}px, ${y}px) scale(${isTargeted ? 1.25 : 1})`,
                     }}
                   >
                     <span className="radial-emoji">{v.emoji}</span>
-                    {isTargeted && <div className="radial-target-halo"></div>}
                   </div>
                 );
               })}
             </div>
-
-            <div className="radial-drag-hint">Rotate thumb to select • Release to send</div>
           </>
         )}
 
-        {/* The Sculpted 3D Glowing Living Heart */}
+        {/* The Clean Minimal Heart */}
         <div
           ref={heartElemRef}
           className={`pure-heart-btn ${heartPulsing ? 'pulse-burst' : ''} ${isHolding ? 'holding-glow' : ''}`}
@@ -731,78 +724,29 @@ export default function App() {
           onMouseMove={handleTouchMove}
           onMouseUp={handleTouchEnd}
         >
-          {/* Ambient layered atmospheric glows */}
-          <div className="heart-ambient-light"></div>
-          <div className="heart-core-bloom"></div>
-
           <svg 
             className="pure-heart-svg" 
             viewBox="0 0 200 185" 
             xmlns="http://www.w3.org/2000/svg"
           >
             <defs>
-              <radialGradient id="heartDeepBody" cx="35%" cy="32%" r="72%">
-                <stop offset="0%" stopColor="#FFA1B5" />
-                <stop offset="18%" stopColor="#FF3366" />
-                <stop offset="55%" stopColor="#D90449" />
-                <stop offset="90%" stopColor="#80062C" />
-                <stop offset="100%" stopColor="#4A0218" />
-              </radialGradient>
-
-              <linearGradient id="heartSpecularSheen" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.85" />
-                <stop offset="35%" stopColor="#FFFFFF" stopOpacity="0.25" />
-                <stop offset="85%" stopColor="#FFFFFF" stopOpacity="0" />
+              <linearGradient id="minimalHeartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#FF375F" />
+                <stop offset="100%" stopColor="#E00034" />
               </linearGradient>
-
-              <linearGradient id="heartSubtleRim" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#FFC2D1" stopOpacity="0.9" />
-                <stop offset="100%" stopColor="#FF3366" stopOpacity="0.1" />
-              </linearGradient>
-
-              <filter id="heartShadowFilter" x="-40%" y="-40%" width="180%" height="180%">
-                <feDropShadow dx="0" dy="20" stdDeviation="28" floodColor="#FF3366" floodOpacity="0.65" />
-                <feDropShadow dx="0" dy="8" stdDeviation="12" floodColor="#FF758F" floodOpacity="0.45" />
-              </filter>
             </defs>
 
-            {/* Glowing Deep Aura Silhouette */}
             <path
-              d="M100 168 C100 168 16 112 16 58 C16 26 38 8 70 8 C88 8 96 18 100 24 C104 18 112 8 130 8 C162 8 184 26 184 58 C184 112 100 168 100 168 Z"
-              fill="url(#heartDeepBody)"
-              filter="url(#heartShadowFilter)"
-            />
-
-            {/* Sculpted 3D Vector Heart Body */}
-            <path
-              d="M100 164 C100 164 20 110 20 58 C20 28 42 10 70 10 C86 10 95 19 100 25 C105 19 114 10 130 10 C158 10 180 28 180 58 C180 110 100 164 100 164 Z"
-              fill="url(#heartDeepBody)"
-            />
-
-            {/* Silky Left Lobe Curvature Highlight */}
-            <path
-              d="M70 13 C46 13 26 29 26 54 C26 80 52 114 82 136 C62 112 38 82 38 56 C38 34 52 21 70 21 C82 21 90 27 95 33 C93 25 84 13 70 13 Z"
-              fill="url(#heartSpecularSheen)"
-            />
-
-            {/* Specular Crest Reflection */}
-            <ellipse 
-              cx="66" 
-              cy="28" 
-              rx="22" 
-              ry="9" 
-              transform="rotate(-22 66 28)"
-              fill="url(#heartSubtleRim)" 
+              d="M100 166 C100 166 18 112 18 58 C18 28 40 10 70 10 C86 10 95 19 100 25 C105 19 114 10 130 10 C160 10 182 28 182 58 C182 112 100 166 100 166 Z"
+              fill="url(#minimalHeartGrad)"
             />
           </svg>
         </div>
 
-        {/* Subtle Gesture Guidance (Visible only when not holding) */}
+        {/* Subtle Minimal Guidance */}
         {!isHolding && (
           <div className="gesture-hint-text">
-            <span>Tap for heartbeat</span>
-            <span className="dot-divider">•</span>
-            <span>Hold for vibes</span>
+            <span>tap for heart • hold for vibes</span>
           </div>
         )}
       </div>

@@ -30,7 +30,7 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", 'Plus Jakarta Sans', sans-serif;
-  background-color: var(--bg);
+  background-color: #060508;
   color: var(--text-main);
   min-height: 100vh;
   display: flex;
@@ -40,9 +40,6 @@ body {
   position: fixed;
   width: 100%;
   height: 100%;
-  background-image: 
-    radial-gradient(circle at 50% 28%, rgba(255, 51, 102, 0.12) 0%, transparent 62%),
-    radial-gradient(circle at 50% 85%, rgba(212, 175, 55, 0.05) 0%, transparent 60%);
 }
 
 #root {
@@ -475,9 +472,10 @@ body {
 
 /* ================= 6. INCOMING PING CARD & 2x2 CLEAN GRID ================= */
 .incoming-ping-pill {
-  background: var(--surface-glass);
+  background: rgba(255, 255, 255, 0.05);
   backdrop-filter: var(--backdrop);
-  border: 1px solid var(--border-active);
+  -webkit-backdrop-filter: var(--backdrop);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-lg);
   padding: 12px 14px;
   display: flex;
@@ -582,66 +580,58 @@ body {
   width: 100%;
 }
 
-/* CIRCULAR RADIAL RING & PREVIEW CARD */
-.radial-preview-card {
+/* ================= 7. CENTER STAGE: MINIMAL ICONIC HEART ================= */
+.center-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+}
+
+/* MINIMAL FLOATING VIBE LABEL */
+.minimal-vibe-label {
   position: absolute;
-  bottom: calc(50% + 148px);
+  bottom: calc(50% + 110px);
   left: 50%;
   transform: translateX(-50%);
-  width: calc(100% - 32px);
-  max-width: 330px;
-  background: rgba(20, 16, 28, 0.94);
-  backdrop-filter: blur(28px);
-  border: 1px solid var(--border-active);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75);
-  z-index: 55;
+  padding: 6px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   pointer-events: none;
+  z-index: 55;
+  white-space: nowrap;
 }
 
-.animate-spring-up {
-  animation: spring-bloom 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+.animate-fade-in {
+  animation: minimal-fade 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes spring-bloom {
-  0% {
+@keyframes minimal-fade {
+  from {
     opacity: 0;
-    transform: translate(-50%, 14px) scale(0.92);
+    transform: translate(-50%, 8px);
   }
-  100% {
+  to {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translate(-50%, 0);
   }
 }
 
-.radial-preview-card .preview-emoji {
-  font-size: 26px;
-  flex-shrink: 0;
+.vibe-label-text {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #FFFFFF;
 }
 
-.radial-preview-card .preview-text-block {
-  flex: 1;
-}
-
-.radial-preview-card .preview-text-block strong {
-  display: block;
-  font-size: 13.5px;
-  color: #FFF;
-  margin-bottom: 2px;
-}
-
-.radial-preview-card .preview-text-block p {
-  font-size: 11px;
-  color: var(--text-muted);
-  line-height: 1.35;
-  font-style: italic;
-}
-
-/* CIRCULAR ORBIT RING & VIBE ORBS */
+/* CLEAN ORBIT RING & VIBE ORBS */
 .radial-orbit-ring {
   position: absolute;
   top: 50%;
@@ -654,145 +644,99 @@ body {
 
 .radial-vibe-orb {
   position: absolute;
-  top: -26px;
-  left: -26px;
-  width: 52px;
-  height: 52px;
+  top: -22px;
+  left: -22px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: rgba(22, 17, 30, 0.88);
+  background: rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(20px);
-  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
-  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.18s ease, border-color 0.18s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   will-change: transform;
+  opacity: 0.7;
 }
 
 .radial-vibe-orb.targeted {
-  background: linear-gradient(135deg, #FF3366, #FF6B8B);
-  border-color: #FFFFFF;
-  box-shadow: 0 0 28px rgba(255, 51, 102, 0.9), 0 0 45px rgba(255, 51, 102, 0.45);
+  background: rgba(255, 45, 85, 0.2);
+  border: 1.5px solid #FFFFFF;
+  box-shadow: 0 0 16px rgba(255, 45, 85, 0.45);
+  opacity: 1;
   z-index: 60;
 }
 
 .radial-emoji {
-  font-size: 23px;
-  transition: transform 0.18s ease;
+  font-size: 20px;
+  transition: transform 0.15s ease;
 }
 
 .radial-vibe-orb.targeted .radial-emoji {
-  transform: scale(1.15);
+  transform: scale(1.1);
 }
 
-.radial-target-halo {
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  border: 1.5px dashed rgba(255, 255, 255, 0.65);
-  animation: spin 8s linear infinite;
-  pointer-events: none;
-}
-
-.radial-drag-hint {
-  position: absolute;
-  top: calc(50% + 148px);
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 11.5px;
-  color: var(--primary-rose);
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  text-shadow: 0 0 10px var(--rose-glow);
-  pointer-events: none;
-  z-index: 50;
-  white-space: nowrap;
-}
-
-/* ================= 8. THE LIVING SCULPTED 3D HEART ================= */
+/* ================= 8. THE CLEAN MINIMAL HEART ================= */
 .pure-heart-btn {
   position: relative;
-  width: 210px;
-  height: 195px;
+  width: 175px;
+  height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-  animation: cardiac-double-beat 2.4s infinite cubic-bezier(0.25, 1, 0.5, 1);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: clean-heartbeat 2.4s infinite cubic-bezier(0.25, 1, 0.5, 1);
   will-change: transform;
 }
 
-/* CARDIAC DOUBLE-PULSE (LUB-DUB) ANIMATION */
-@keyframes cardiac-double-beat {
+/* CLEAN RESTING CARDIAC BEAT */
+@keyframes clean-heartbeat {
   0% { transform: scale(1); }
-  12% { transform: scale(1.06); }
+  12% { transform: scale(1.05); }
   22% { transform: scale(1.01); }
-  34% { transform: scale(1.12); }
+  34% { transform: scale(1.08); }
   52% { transform: scale(1); }
   100% { transform: scale(1); }
 }
 
 .pure-heart-btn.holding-glow {
-  transform: scale(0.92) !important;
+  transform: scale(0.93) !important;
   animation: none !important;
 }
 
 .pure-heart-btn.pulse-burst {
-  animation: heart-burst-pulse 0.75s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
+  animation: clean-burst 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
 }
 
-@keyframes heart-burst-pulse {
-  0% { transform: scale(0.92); }
-  45% { transform: scale(1.22); }
+@keyframes clean-burst {
+  0% { transform: scale(0.93); }
+  45% { transform: scale(1.16); }
   100% { transform: scale(1); }
 }
 
 .pure-heart-svg {
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 14px 28px rgba(255, 51, 102, 0.5));
+  filter: drop-shadow(0 10px 24px rgba(255, 45, 85, 0.35));
   transition: filter 0.2s ease;
   overflow: visible;
 }
 
 .pure-heart-btn.holding-glow .pure-heart-svg {
-  filter: drop-shadow(0 0 45px rgba(255, 51, 102, 0.85));
+  filter: drop-shadow(0 0 28px rgba(255, 45, 85, 0.6));
 }
 
-.heart-ambient-light {
-  position: absolute;
-  width: 170px;
-  height: 170px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 51, 102, 0.35) 0%, transparent 70%);
-  filter: blur(28px);
-  z-index: -1;
+.gesture-hint-text {
+  margin-top: 24px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.5px;
+  text-transform: lowercase;
   pointer-events: none;
-  animation: aura-breathe 2.4s infinite ease-in-out;
-}
-
-@keyframes aura-breathe {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  34% { opacity: 0.85; transform: scale(1.2); }
-}
-
-.heart-core-bloom {
-  position: absolute;
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  filter: blur(22px);
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.pure-heart-btn.holding-glow .heart-core-bloom {
-  opacity: 1;
 }
 
 .gesture-hint-text {
