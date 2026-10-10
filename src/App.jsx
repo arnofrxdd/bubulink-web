@@ -2,17 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   Heart, 
-  Send, 
   Bell, 
   RefreshCw, 
-  Smartphone,
-  X,
-  Camera,
-  Edit3,
-  MapPin,
-  Sparkles,
-  CheckCircle2,
-  Image as ImageIcon
+  X, 
+  Edit3, 
+  CheckCircle2, 
+  ChevronUp, 
+  ChevronDown,
+  Share,
+  PlusSquare,
+  Sparkles
 } from 'lucide-react';
 import { 
   sendPingToFirestore, 
@@ -23,66 +22,22 @@ import {
   heartDailyNote,
   showSystemNotification,
   playChimeSound,
-  registerPushWithVPS,
-  compressImage
+  registerPushWithVPS
 } from './firebase';
 
-const QUICK_PINGS = [
-  {
-    id: 'missing',
-    emoji: '🥺',
-    label: 'Missing You',
-    defaultMsg: 'Missing you so much right now. Wishing you were here with me ❤️',
-  },
-  {
-    id: 'call',
-    emoji: '📞',
-    label: 'Free to Call?',
-    defaultMsg: 'Are you free to talk? Ring me whenever you get this! 📞',
-  },
-  {
-    id: 'safe',
-    emoji: '🏡',
-    label: 'Reached Safely',
-    defaultMsg: 'Just reached safely! All settled and wanted to let you know ✨',
-  },
-  {
-    id: 'hug',
-    emoji: '🫂',
-    label: 'Need a Hug',
-    defaultMsg: 'Feeling a little low right now... really need a tight hug from you 🫂',
-  },
-  {
-    id: 'thinking',
-    emoji: '💭',
-    label: 'Thinking of You',
-    defaultMsg: 'Just stopped everything because you randomly crossed my mind 🥰',
-  },
-  {
-    id: 'cute',
-    emoji: '✨',
-    label: 'Saw Something Cute',
-    defaultMsg: 'Spotted something super cute and immediately thought of you! 💕',
-  },
-  {
-    id: 'morning',
-    emoji: '☀️',
-    label: 'Good Morning',
-    defaultMsg: 'Good morning my sunshine! Hope you have an amazing day ahead ☀️🌸',
-  },
-  {
-    id: 'night',
-    emoji: '🌙',
-    label: 'Good Night',
-    defaultMsg: 'Going to sleep now, love you to the moon and back! Dream of me 🌙💤',
-  },
+const RADIAL_VIBES = [
+  { id: 'missing', emoji: '🥺', label: 'Missing You', msg: 'Missing you so much right now. Thinking of you ❤️' },
+  { id: 'call', emoji: '📞', label: 'Call Me', msg: 'Are you free to talk? Ring me whenever you get this! 📞' },
+  { id: 'hug', emoji: '🫂', label: 'Need a Hug', msg: 'Feeling a little low... really need a tight hug from you 🫂' },
+  { id: 'safe', emoji: '🏡', label: 'Reached Home', msg: 'Just reached safely! All good here ✨' },
+  { id: 'night', emoji: '🌙', label: 'Goodnight', msg: 'Going to sleep now, love you to the moon and back! 🌙💤' },
+  { id: 'morning', emoji: '☀️', label: 'Good Morning', msg: 'Good morning my sunshine! Hope you have the best day ☀️🌸' },
 ];
 
-const QUICK_REACTIONS = [
-  { emoji: '📞', label: 'Calling in 5 mins' },
+const QUICK_REPLIES = [
+  { emoji: '📞', label: 'Calling in 5m' },
   { emoji: '💖', label: 'Love you so much' },
-  { emoji: '🫂', label: 'Sending big hugs' },
-  { emoji: '🥰', label: 'Saw this! So cute' },
+  { emoji: '🫂', label: 'Huge hug sent' },
   { emoji: '🚗', label: 'On my way' },
 ];
 
@@ -91,17 +46,24 @@ export default function App() {
   const [notifGranted, setNotifGranted] = useState(false);
   const [pings, setPings] = useState([]);
   const [dailyNote, setDailyNote] = useState(null);
-  const [selectedPing, setSelectedPing] = useState(QUICK_PINGS[0]);
-  const [customNote, setCustomNote] = useState('');
-  const [photoDataUrl, setPhotoDataUrl] = useState(null);
-  const [isSending, setIsSending] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [newNoteText, setNewNoteText] = useState('');
   const [toastAlert, setToastAlert] = useState(null);
-  const [fullscreenImage, setFullscreenImage] = useState(null);
+  const [showDrawer, setShowDrawer] = useState(false);
 
-  const fileInputRef = useRef(null);
+  // iOS Safari Standalone Detection Gate
+  const [isStandalone, setIsStandalone] = useState(true);
+  const [dismissInstallGate, setDismissInstallGate] = useState(false);
+
+  // Gesture state for Center Smart Heart
+  const [isHolding, setIsHolding] = useState(false);
+  const [selectedVibeIndex, setSelectedVibeIndex] = useState(null);
+  const [heartPulsing, setHeartPulsing] = useState(false);
+
+  const holdTimerRef = useRef(null);
+  const heartCenterRef = useRef({ x: 0, y: 0 });
+  const heartElemRef = useRef(null);
   const lastPingIdRef = useRef(null);
   const lastReactionRef = useRef(null);
 
@@ -109,8 +71,20 @@ export default function App() {
   const partnerName = role === 'zenah' ? 'Arnav' : 'Zenah';
   const myName = role === 'zenah' ? 'Zenah' : 'Arnav';
 
-  // Check notification permission on mount
+  // Check iOS standalone mode on mount
   useEffect(() => {
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const standaloneMode = window.navigator.standalone === true || 
+      window.matchMedia('(display-mode: standalone)').matches;
+
+    // Only force install screen if on iOS and NOT standalone
+    if (isIOSDevice && !standaloneMode) {
+      setIsStandalone(false);
+    } else {
+      setIsStandalone(true);
+    }
+
     if ('Notification' in window && Notification.permission === 'granted') {
       setNotifGranted(true);
     }
@@ -118,7 +92,7 @@ export default function App() {
     const handleAlert = (e) => {
       const { title, body } = e.detail;
       setToastAlert({ title, body, id: Date.now() });
-      setTimeout(() => setToastAlert(null), 5000);
+      setTimeout(() => setToastAlert(null), 4000);
     };
 
     window.addEventListener('bubulink_alert', handleAlert);
@@ -127,9 +101,7 @@ export default function App() {
 
   // Listen to daily sticky note in real-time
   useEffect(() => {
-    const unsub = subscribeToDailyNote((note) => {
-      setDailyNote(note);
-    });
+    const unsub = subscribeToDailyNote((note) => setDailyNote(note));
     return () => unsub();
   }, []);
 
@@ -140,7 +112,6 @@ export default function App() {
         const top = list[0];
         const currentRole = localStorage.getItem('bubulink_role');
 
-        // New incoming ping from partner
         if (currentRole && top.sender !== currentRole) {
           if (lastPingIdRef.current && lastPingIdRef.current !== top.id) {
             showSystemNotification(
@@ -151,7 +122,6 @@ export default function App() {
           lastPingIdRef.current = top.id;
         }
 
-        // Reaction from partner on my ping
         if (currentRole && top.sender === currentRole && top.reaction) {
           const reactionKey = `${top.id}_${top.reaction}`;
           if (lastReactionRef.current && lastReactionRef.current !== reactionKey) {
@@ -169,7 +139,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Sync push registration whenever role changes
+  // Auto-sync push registration on role change
   useEffect(() => {
     const currentRole = localStorage.getItem('bubulink_role');
     if (currentRole) {
@@ -200,67 +170,78 @@ export default function App() {
     }
   };
 
-  // Image Selection & Compression
-  const handlePhotoSelect = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const compressed = await compressImage(file, 800, 0.7);
-      setPhotoDataUrl(compressed);
-    } catch (err) {
-      console.error('Error compressing image:', err);
-    }
-  };
-
-  // Send Ping
-  const handleSendPing = async () => {
+  // SEND 1-TAP DEFAULT HEARTBEAT (Instant Click)
+  const fireHeartbeatPing = async () => {
     if (!role) return;
-    setIsSending(true);
+    setHeartPulsing(true);
+    setTimeout(() => setHeartPulsing(false), 800);
 
-    const message = customNote.trim().length > 0 
-      ? customNote.trim() 
-      : selectedPing.defaultMsg;
+    if (navigator.vibrate) {
+      navigator.vibrate([50, 60, 50]);
+    }
+    playChimeSound();
 
-    const newPing = {
+    confetti({
+      particleCount: 45,
+      spread: 60,
+      origin: { y: 0.5 },
+      colors: ['#E55675', '#FF758F', '#FFB3C1', '#FFFFFF'],
+    });
+
+    const ping = {
       id: Date.now().toString(),
       sender: role,
       recipient: partnerRole,
-      tag: selectedPing.label,
-      emoji: selectedPing.emoji,
-      message,
-      image: photoDataUrl || null,
+      tag: 'Heartbeat',
+      emoji: '💖',
+      message: 'Thinking of you right now ❤️',
       timestamp: new Date().toISOString(),
       reaction: null,
       responderRole: null,
       reactionTimestamp: null,
     };
 
-    confetti({
-      particleCount: 45,
-      spread: 60,
-      origin: { y: 0.65 },
-      colors: ['#E55675', '#FF9EB1', '#D4AF37', '#FFFFFF'],
-    });
-
-    playChimeSound();
-    await sendPingToFirestore(newPing);
-
-    setCustomNote('');
-    setPhotoDataUrl(null);
-    setIsSending(false);
-    showSystemNotification('⚡ Ping Sent!', `Delivered to ${partnerName}'s lock screen!`);
+    await sendPingToFirestore(ping);
+    showSystemNotification('💖 Heartbeat Sent!', `Delivered to ${partnerName}'s lock screen!`);
   };
 
-  // React to Partner's Ping
-  const handleReact = async (pingId, reactionLabel, originalSender) => {
-    await reactToPingInFirestore(pingId, reactionLabel, role, originalSender);
+  // SEND RADIAL VIBE PING (Drag & Release)
+  const fireRadialPing = async (vibe) => {
+    if (!role || !vibe) return;
+
+    if (navigator.vibrate) {
+      navigator.vibrate([70, 80, 70]);
+    }
+    playChimeSound();
+
     confetti({
-      particleCount: 30,
-      spread: 50,
-      origin: { y: 0.7 },
-      colors: ['#E55675', '#FFD700', '#FFFFFF'],
+      particleCount: 50,
+      spread: 70,
+      origin: { y: 0.5 },
+      colors: ['#E55675', '#D4AF37', '#FF758F', '#FFFFFF'],
     });
+
+    const ping = {
+      id: Date.now().toString(),
+      sender: role,
+      recipient: partnerRole,
+      tag: vibe.label,
+      emoji: vibe.emoji,
+      message: vibe.msg,
+      timestamp: new Date().toISOString(),
+      reaction: null,
+      responderRole: null,
+      reactionTimestamp: null,
+    };
+
+    await sendPingToFirestore(ping);
+    showSystemNotification(`${vibe.emoji} Sent!`, `Alert delivered to ${partnerName}!`);
+  };
+
+  // Quick Reply to partner's latest ping
+  const handleReact = async (pingId, replyLabel, originalSender) => {
+    await reactToPingInFirestore(pingId, replyLabel, role, originalSender);
+    confetti({ particleCount: 30, spread: 50, origin: { y: 0.25 } });
     playChimeSound();
   };
 
@@ -276,7 +257,7 @@ export default function App() {
     setNewNoteText('');
     setShowNoteModal(false);
     playChimeSound();
-    confetti({ particleCount: 30, spread: 50 });
+    confetti({ particleCount: 35, spread: 50 });
   };
 
   const handleHeartNote = async () => {
@@ -291,18 +272,125 @@ export default function App() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // ONBOARDING SCREEN
+  // ================= GESTURE HANDLERS FOR CENTER SMART HEART =================
+  const handleTouchStart = (e) => {
+    // Record center point of the heart on screen
+    if (heartElemRef.current) {
+      const rect = heartElemRef.current.getBoundingClientRect();
+      heartCenterRef.current = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+    }
+
+    // Set hold timer (260ms threshold for Hold vs Tap)
+    holdTimerRef.current = setTimeout(() => {
+      setIsHolding(true);
+      if (navigator.vibrate) navigator.vibrate(40);
+    }, 260);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isHolding) return;
+
+    const touch = e.touches ? e.touches[0] : e;
+    const dx = touch.clientX - heartCenterRef.current.x;
+    const dy = touch.clientY - heartCenterRef.current.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    // If dragged outside the center deadzone (> 40px)
+    if (dist > 40) {
+      let angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI; // -180 to 180
+      // Normalize angle relative to top (-90deg is 0)
+      let normAngle = (angleDeg + 90 + 360) % 360;
+
+      // 6 vibes = 60 degrees each
+      let index = Math.round(normAngle / 60) % 6;
+      if (index !== selectedVibeIndex) {
+        setSelectedVibeIndex(index);
+        if (navigator.vibrate) navigator.vibrate(20);
+      }
+    } else {
+      setSelectedVibeIndex(null);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+
+    if (isHolding) {
+      // User held and released
+      if (selectedVibeIndex !== null && RADIAL_VIBES[selectedVibeIndex]) {
+        fireRadialPing(RADIAL_VIBES[selectedVibeIndex]);
+      }
+      setIsHolding(false);
+      setSelectedVibeIndex(null);
+    } else {
+      // User quick tapped
+      fireHeartbeatPing();
+    }
+  };
+
+  // 1. SAFARI INSTALLATION GATE (Shown only in normal iOS Safari browser)
+  if (!isStandalone && !dismissInstallGate) {
+    return (
+      <div className="install-gate-overlay">
+        <div className="install-gate-card animate-slide-in">
+          <div className="app-icon-preview-glow">
+            <img src="./apple-touch-icon.png" alt="BubuLink" className="app-icon-preview" />
+          </div>
+          <h2>Install BubuLink on iPhone 📱</h2>
+          <p className="install-gate-desc">
+            Apple requires adding this app to your Home Screen for lock-screen alerts to work!
+          </p>
+
+          <div className="install-steps-list">
+            <div className="install-step-item">
+              <span className="step-num">1</span>
+              <div className="step-text">
+                Tap Safari <strong>Share</strong> button <Share size={15} className="inline-icon" /> at the bottom
+              </div>
+            </div>
+            <div className="install-step-item">
+              <span className="step-num">2</span>
+              <div className="step-text">
+                Scroll down and tap <strong>Add to Home Screen</strong> <PlusSquare size={15} className="inline-icon" />
+              </div>
+            </div>
+            <div className="install-step-item">
+              <span className="step-num">3</span>
+              <div className="step-text">
+                Open <strong>BubuLink</strong> from your Home Screen! ✨
+              </div>
+            </div>
+          </div>
+
+          <div className="bouncing-arrow">⬇️</div>
+
+          <button 
+            className="skip-install-btn"
+            onClick={() => setDismissInstallGate(true)}
+          >
+            Continue in browser anyway
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. ONBOARDING (Role select if first time)
   if (!role) {
     return (
       <div className="app-container onboarding-screen">
         <div className="onboarding-card">
-          <div className="brand-icon-badge animate-float">💖</div>
-          <h1 className="brand-title">BubuLink</h1>
-          <div className="badge-pill connection-pill">
-            <Sparkles size={13} />
-            <span>Private Couple Portal</span>
+          <div className="app-icon-preview-glow">
+            <img src="./apple-touch-icon.png" alt="BubuLink" className="app-icon-preview" />
           </div>
-          <p className="onboarding-sub">Select who is using this phone:</p>
+          <h1 className="brand-title">BubuLink</h1>
+          <p className="onboarding-sub">Who is using this phone?</p>
 
           <div className="role-cards-grid">
             <button 
@@ -311,9 +399,8 @@ export default function App() {
             >
               <div className="role-avatar">🌸</div>
               <div className="role-info">
-                <span className="role-tag pink">Assam 📍</span>
                 <h2>I'm Zenah 👑</h2>
-                <p>The Wife • Love & Sanctuary</p>
+                <p>The Wife • Assam</p>
               </div>
             </button>
 
@@ -323,28 +410,21 @@ export default function App() {
             >
               <div className="role-avatar">💍</div>
               <div className="role-info">
-                <span className="role-tag gold">Always on Standby</span>
                 <h2>I'm Arnav 💖</h2>
-                <p>The Husband • 24/7 Connected</p>
+                <p>The Husband • Standby</p>
               </div>
             </button>
-          </div>
-
-          <div className="pwa-hint">
-            <Smartphone size={14} />
-            <span>Lock-screen alerts: Tap Safari <strong>Share ⬆️</strong> &gt; <strong>Add to Home Screen</strong></span>
           </div>
         </div>
       </div>
     );
   }
 
-  // Partner's latest ping
   const latestPartnerPing = pings.find(p => p.sender === partnerRole);
 
   return (
-    <div className="app-container">
-      {/* In-app Toast Banner */}
+    <div className="app-container smart-screen">
+      {/* Floating In-App Toast */}
       {toastAlert && (
         <div className="toast-floating-banner animate-bounce-in" onClick={() => setToastAlert(null)}>
           <div className="toast-icon">⚡</div>
@@ -356,292 +436,208 @@ export default function App() {
         </div>
       )}
 
-      {/* Top Distance & Status Header */}
-      <header className="app-header">
-        <div className="distance-bar">
-          <div className="distance-node">
-            <span className="node-dot pink-dot"></span>
-            <span className="node-label">Assam (Zenah 🌸)</span>
-          </div>
-          <div className="distance-track">
-            <span className="pulse-heart">❤️</span>
-            <span className="distance-text">~1,800 km</span>
-          </div>
-          <div className="distance-node">
-            <span className="node-dot gold-dot"></span>
-            <span className="node-label">Arnav 💍</span>
-          </div>
-        </div>
+      {/* ULTRA-MINIMAL TOP BAR */}
+      <header className="minimal-header">
+        <button 
+          className="user-pill-btn"
+          onClick={() => setShowRoleModal(true)}
+        >
+          <span className="user-pill-avatar">{role === 'zenah' ? '🌸' : '💍'}</span>
+          <span className="user-pill-name">{myName}</span>
+          <RefreshCw size={12} className="switch-icon" />
+        </button>
 
-        <div className="header-meta-row">
-          <div className="user-profile-chip">
-            <span className="avatar-mini">{role === 'zenah' ? '🌸' : '💍'}</span>
-            <div>
-              <h3 className="profile-name">{myName}</h3>
-              <div className="live-status-row">
-                <span className="live-pulse"></span>
-                <span>Realtime Connected</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="header-actions">
-            <button 
-              className={`action-btn ${notifGranted ? 'active' : ''}`}
-              onClick={handleEnableNotifs}
-              title="Push Notification Status"
-            >
-              <Bell size={15} />
-              <span>{notifGranted ? 'Alerts ON' : 'Enable Alerts'}</span>
-            </button>
-            <button 
-              className="action-btn switch-btn" 
-              onClick={() => setShowRoleModal(true)}
-              title="Switch Profile"
-            >
-              <RefreshCw size={15} />
-            </button>
-          </div>
-        </div>
+        <button 
+          className={`notif-pill-btn ${notifGranted ? 'active' : ''}`}
+          onClick={handleEnableNotifs}
+          title="Notification Status"
+        >
+          <Bell size={14} />
+          <span>{notifGranted ? 'Alerts ON' : 'Enable'}</span>
+        </button>
       </header>
 
-      {/* Main App Body */}
-      <main className="main-content">
-        
-        {/* ================= 1. DAILY STICKY LOVE NOTE ================= */}
-        <section className="sticky-note-card">
-          <div className="sticky-note-header">
-            <div className="note-title-row">
-              <span className="note-icon">💌</span>
-              <h4>Today's Love Note</h4>
+      {/* PARTNER'S LATEST INCOMING PING (Floating Pill) */}
+      {latestPartnerPing && (
+        <div className="incoming-ping-pill animate-slide-in">
+          <div className="incoming-ping-top">
+            <span className="incoming-emoji">{latestPartnerPing.emoji}</span>
+            <div className="incoming-text">
+              <strong>{partnerName}: {latestPartnerPing.tag}</strong>
+              <small>{formatTime(latestPartnerPing.timestamp)}</small>
             </div>
-            <button 
-              className="note-edit-btn"
-              onClick={() => {
-                setNewNoteText(dailyNote?.content || '');
-                setShowNoteModal(true);
-              }}
-            >
-              <Edit3 size={13} />
-              <span>{dailyNote ? 'Edit' : 'Write'}</span>
-            </button>
           </div>
 
-          <p className="note-content">
-            {dailyNote?.content || 'Leave a sweet note for your partner to see every time they open the app! 💕'}
-          </p>
-
-          <div className="note-footer">
-            <span className="note-author">
-              {dailyNote?.author ? `Written by ${dailyNote.author === 'zenah' ? 'Zenah' : 'Arnav'}` : 'Tap edit to write'}
-            </span>
-
-            {dailyNote && (
-              <div className="note-heart-area">
-                {dailyNote.lovedBy ? (
-                  <span className="loved-stamp">Loved by {dailyNote.lovedBy === 'zenah' ? 'Zenah' : 'Arnav'} ❤️</span>
-                ) : (
-                  <button className="heart-note-btn" onClick={handleHeartNote}>
-                    <Heart size={14} className="heart-fill" />
-                    <span>Love this</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* ================= 2. PARTNER'S LATEST MOMENT HERO ================= */}
-        {latestPartnerPing && (
-          <section className="partner-hero-card animate-slide-in">
-            <div className="hero-header">
-              <div className="hero-badge">
-                <span className="live-sparkle">⚡</span>
-                <span>LATEST FROM {partnerName.toUpperCase()}</span>
-              </div>
-              <span className="hero-time">{formatTime(latestPartnerPing.timestamp)}</span>
-            </div>
-
-            <div className="hero-body">
-              <div className="hero-tag-row">
-                <span className="hero-emoji">{latestPartnerPing.emoji}</span>
-                <span className="hero-tag-text">{latestPartnerPing.tag}</span>
-              </div>
-              <p className="hero-message">“{latestPartnerPing.message}”</p>
-
-              {latestPartnerPing.image && (
-                <div 
-                  className="hero-image-wrapper"
-                  onClick={() => setFullscreenImage(latestPartnerPing.image)}
-                >
-                  <img src={latestPartnerPing.image} alt="Shared moment" />
-                  <span className="tap-expand-hint">Tap to expand 🔍</span>
-                </div>
-              )}
-            </div>
-
-            {/* Quick 1-Tap Response Bar */}
-            <div className="reaction-section">
-              <div className="reaction-title">Quick 1-Tap Reply to {partnerName}:</div>
-              <div className="reactions-pill-grid">
-                {QUICK_REACTIONS.map((r) => {
-                  const isSelected = latestPartnerPing.reaction === r.label;
-                  return (
-                    <button
-                      key={r.label}
-                      className={`reaction-pill ${isSelected ? 'active' : ''}`}
-                      onClick={() => handleReact(latestPartnerPing.id, r.label, latestPartnerPing.sender)}
-                    >
-                      <span className="rx-emoji">{r.emoji}</span>
-                      <span className="rx-text">{r.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ================= 3. 1-TAP INSTANT PING GRID ================= */}
-        <section className="ping-section">
-          <div className="section-title-row">
-            <h3>Send 1-Tap Alert to {partnerName} ⚡</h3>
-            <span className="section-hint">Pings their lock screen</span>
-          </div>
-
-          <div className="quick-pings-grid">
-            {QUICK_PINGS.map((p) => {
-              const isSelected = selectedPing.id === p.id;
+          {/* Quick 1-Tap Reactions Bar */}
+          <div className="quick-replies-row">
+            {QUICK_REPLIES.map((r) => {
+              const isSelected = latestPartnerPing.reaction === r.label;
               return (
                 <button
-                  key={p.id}
-                  className={`ping-chip ${isSelected ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedPing(p);
-                    playChimeSound();
-                  }}
+                  key={r.label}
+                  className={`reply-chip ${isSelected ? 'selected' : ''}`}
+                  onClick={() => handleReact(latestPartnerPing.id, r.label, latestPartnerPing.sender)}
                 >
-                  <span className="ping-chip-emoji">{p.emoji}</span>
-                  <span className="ping-chip-label">{p.label}</span>
+                  <span>{r.emoji}</span>
+                  <span>{r.label}</span>
                 </button>
               );
             })}
           </div>
+        </div>
+      )}
 
-          {/* Photo Drop & Custom Note Bar */}
-          <div className="ping-composer-card">
-            <div className="composer-row">
-              <input
-                type="text"
-                className="composer-input"
-                placeholder={`Optional custom note (Default: "${selectedPing.defaultMsg}")`}
-                value={customNote}
-                onChange={(e) => setCustomNote(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendPing()}
-              />
+      {/* ================= CENTER STAGE: THE SMART HEART ================= */}
+      <div className="center-stage">
+        
+        {/* Expanding Radial Halo of Vibes on Hold */}
+        {isHolding && (
+          <div className="radial-halo-container">
+            {RADIAL_VIBES.map((v, i) => {
+              // Calculate circular coordinates: radius = 120px
+              const angleDeg = i * 60 - 90;
+              const angleRad = (angleDeg * Math.PI) / 180;
+              const x = Math.round(120 * Math.cos(angleRad));
+              const y = Math.round(120 * Math.sin(angleRad));
+              const isTargeted = selectedVibeIndex === i;
 
-              <button 
-                type="button" 
-                className={`photo-picker-btn ${photoDataUrl ? 'has-photo' : ''}`}
-                onClick={() => fileInputRef.current?.click()}
-                title="Attach Photo"
-              >
-                <Camera size={18} />
-              </button>
-              <input 
-                ref={fileInputRef}
-                type="file" 
-                accept="image/*" 
-                style={{ display: 'none' }}
-                onChange={handlePhotoSelect}
-              />
+              return (
+                <div
+                  key={v.id}
+                  className={`radial-vibe-bubble ${isTargeted ? 'targeted' : ''}`}
+                  style={{
+                    transform: `translate(${x}px, ${y}px) scale(${isTargeted ? 1.3 : 1})`,
+                  }}
+                >
+                  <span className="radial-emoji">{v.emoji}</span>
+                  <span className="radial-label">{v.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* The Giant Tactile Heart */}
+        <div
+          ref={heartElemRef}
+          className={`smart-heart-btn ${heartPulsing ? 'pulse-burst' : ''} ${isHolding ? 'holding-aura' : ''}`}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onMouseDown={handleTouchStart}
+          onMouseMove={handleTouchMove}
+          onMouseUp={handleTouchEnd}
+        >
+          <div className="heart-aura-layer"></div>
+          <svg className="heart-svg" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </div>
+
+        {/* Minimal Smart Gesture Hint */}
+        <div className="gesture-hint-text">
+          {isHolding 
+            ? (selectedVibeIndex !== null ? `Release to send ${RADIAL_VIBES[selectedVibeIndex].label}!` : 'Slide thumb to select vibe')
+            : 'Tap for heartbeat • Hold to slide vibe'
+          }
+        </div>
+      </div>
+
+      {/* ================= BOTTOM DRAWER TRIGGER ================= */}
+      <footer className="bottom-drawer-trigger">
+        <button 
+          className="drawer-pill-btn"
+          onClick={() => setShowDrawer(true)}
+        >
+          <ChevronUp size={16} />
+          <span>Love Note & Moments 💌</span>
+        </button>
+      </footer>
+
+      {/* ================= SLIDE-UP DRAWER (Note & Moments Feed) ================= */}
+      {showDrawer && (
+        <div className="drawer-overlay" onClick={() => setShowDrawer(false)}>
+          <div className="drawer-sheet animate-slide-in" onClick={(e) => e.stopPropagation()}>
+            <div className="drawer-handle-bar">
+              <span className="drawer-notch"></span>
             </div>
 
-            {/* Photo preview thumbnail */}
-            {photoDataUrl && (
-              <div className="photo-preview-bar">
-                <img src={photoDataUrl} alt="Preview" className="thumb-preview" />
-                <span className="photo-attached-text">Photo attached</span>
+            <div className="drawer-header">
+              <h3>Love Space & Memories 💌</h3>
+              <button className="drawer-close-btn" onClick={() => setShowDrawer(false)}>
+                <ChevronDown size={18} />
+              </button>
+            </div>
+
+            {/* Daily Love Note Widget */}
+            <div className="drawer-note-card">
+              <div className="drawer-note-top">
+                <span className="note-badge">TODAY'S NOTE</span>
                 <button 
-                  className="remove-photo-btn"
-                  onClick={() => setPhotoDataUrl(null)}
+                  className="note-edit-icon-btn"
+                  onClick={() => {
+                    setNewNoteText(dailyNote?.content || '');
+                    setShowNoteModal(true);
+                  }}
                 >
-                  <X size={14} />
+                  <Edit3 size={13} />
+                  <span>{dailyNote ? 'Edit' : 'Write'}</span>
                 </button>
               </div>
-            )}
 
-            {/* Big Send Button */}
-            <button 
-              className="send-ping-hero-btn"
-              onClick={handleSendPing}
-              disabled={isSending}
-            >
-              <span className="send-btn-emoji">{selectedPing.emoji}</span>
-              <div className="send-btn-text">
-                <strong>Ping {partnerName} Now</strong>
-                <small>Sends lock-screen push notification ⚡</small>
-              </div>
-              <Send size={18} className="send-arrow" />
-            </button>
-          </div>
-        </section>
+              <p className="drawer-note-text">
+                {dailyNote?.content || 'Leave a sweet note for your partner to read! 💕'}
+              </p>
 
-        {/* ================= 4. SHARED TIMELINE ================= */}
-        <section className="timeline-section">
-          <div className="section-title-row">
-            <h3>Moments & Activity 💌</h3>
-            <span className="section-count">{pings.length} moments</span>
-          </div>
+              <div className="drawer-note-footer">
+                <span className="note-author-tag">
+                  {dailyNote?.author ? `From ${dailyNote.author === 'zenah' ? 'Zenah' : 'Arnav'}` : ''}
+                </span>
 
-          {pings.length === 0 ? (
-            <div className="empty-state">
-              <p>No moments yet. Send your first 1-tap ping above! 💕</p>
-            </div>
-          ) : (
-            <div className="timeline-list">
-              {pings.map((p) => {
-                const isFromMe = p.sender === role;
-                const senderDisplayName = p.sender === 'zenah' ? 'Zenah' : 'Arnav';
-
-                return (
-                  <div key={p.id} className={`moment-item ${isFromMe ? 'from-me' : 'from-partner'}`}>
-                    <div className="moment-top">
-                      <div className="moment-sender-tag">
-                        <span className="moment-emoji">{p.emoji}</span>
-                        <strong>{senderDisplayName}</strong>
-                        <span className="moment-tag-badge">{p.tag}</span>
-                      </div>
-                      <span className="moment-time">{formatTime(p.timestamp)}</span>
-                    </div>
-
-                    <p className="moment-msg">“{p.message}”</p>
-
-                    {p.image && (
-                      <div 
-                        className="moment-thumb-container"
-                        onClick={() => setFullscreenImage(p.image)}
-                      >
-                        <img src={p.image} alt="Moment snapshot" />
-                      </div>
-                    )}
-
-                    {p.reaction && (
-                      <div className="moment-reaction-pill">
-                        <span>❤️ {p.reaction}</span>
-                      </div>
+                {dailyNote && (
+                  <div>
+                    {dailyNote.lovedBy ? (
+                      <span className="loved-tag">Loved by {dailyNote.lovedBy === 'zenah' ? 'Zenah' : 'Arnav'} ❤️</span>
+                    ) : (
+                      <button className="heart-action-btn" onClick={handleHeartNote}>
+                        <Heart size={13} />
+                        <span>Love this</span>
+                      </button>
                     )}
                   </div>
-                );
-              })}
+                )}
+              </div>
             </div>
-          )}
-        </section>
-      </main>
+
+            {/* Timeline Moments Feed */}
+            <div className="drawer-timeline-section">
+              <h4>Recent Moments</h4>
+              {pings.length === 0 ? (
+                <div className="drawer-empty-state">No moments yet. Tap the heart to send one! 💖</div>
+              ) : (
+                <div className="drawer-pings-list">
+                  {pings.map((p) => (
+                    <div key={p.id} className="drawer-ping-item">
+                      <div className="ping-item-left">
+                        <span className="item-emoji">{p.emoji}</span>
+                        <div>
+                          <strong>{p.sender === 'zenah' ? 'Zenah' : 'Arnav'}</strong>
+                          <p>{p.message}</p>
+                        </div>
+                      </div>
+                      <span className="item-time">{formatTime(p.timestamp)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ================= MODALS ================= */}
 
-      {/* Edit Daily Love Note Modal */}
+      {/* Write Daily Love Note Modal */}
       {showNoteModal && (
         <div className="modal-overlay" onClick={() => setShowNoteModal(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -651,7 +647,6 @@ export default function App() {
                 <X size={16} />
               </button>
             </div>
-            <p className="modal-sub">This stays pinned at the top of both your screens.</p>
             <textarea
               className="note-textarea"
               rows={4}
@@ -659,16 +654,14 @@ export default function App() {
               value={newNoteText}
               onChange={(e) => setNewNoteText(e.target.value)}
             />
-            <div className="modal-action-row">
-              <button className="modal-save-btn" onClick={handleSaveDailyNote}>
-                Save & Alert {partnerName} 💖
-              </button>
-            </div>
+            <button className="modal-save-btn" onClick={handleSaveDailyNote}>
+              Save Note 💖
+            </button>
           </div>
         </div>
       )}
 
-      {/* Role Switcher Modal */}
+      {/* Switch Role Modal */}
       {showRoleModal && (
         <div className="modal-overlay" onClick={() => setShowRoleModal(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -678,7 +671,6 @@ export default function App() {
                 <X size={16} />
               </button>
             </div>
-            <p className="modal-sub">Choose which phone interface to use:</p>
 
             <div className="modal-roles-list">
               <button 
@@ -709,16 +701,6 @@ export default function App() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Fullscreen Photo Viewer */}
-      {fullscreenImage && (
-        <div className="fullscreen-overlay" onClick={() => setFullscreenImage(null)}>
-          <button className="fullscreen-close-btn" onClick={() => setFullscreenImage(null)}>
-            <X size={20} />
-          </button>
-          <img src={fullscreenImage} alt="Fullscreen moment" className="fullscreen-img" />
         </div>
       )}
     </div>
