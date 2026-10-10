@@ -66,12 +66,69 @@ const VIBE_OPTIONS = [
   },
 ];
 
-const QUICK_REPLIES = [
-  { emoji: '💖', label: 'Love you forever' },
-  { emoji: '📞', label: 'Calling right now' },
-  { emoji: '🫂', label: 'Holding you close' },
-  { emoji: '🥰', label: 'You made my day' },
-];
+const DYNAMIC_REPLIES = {
+  call: [
+    { emoji: '📞', label: 'Calling right now' },
+    { emoji: '⏳', label: 'Give me 5 mins' },
+    { emoji: '🕒', label: 'Free in 15 mins' },
+    { emoji: '💬', label: "Can't talk, text me!" },
+  ],
+  night: [
+    { emoji: '😴', label: 'Sweet dreams my love' },
+    { emoji: '🌙', label: 'Sleep tight bubu' },
+    { emoji: '❤️', label: 'Love you to the moon' },
+    { emoji: '✨', label: 'See you tomorrow' },
+  ],
+  morning: [
+    { emoji: '☕', label: 'Good morning sunshine!' },
+    { emoji: '🌸', label: 'Have the best day' },
+    { emoji: '🥰', label: 'Missed you overnight' },
+    { emoji: '💖', label: 'Morning kisses' },
+  ],
+  missing: [
+    { emoji: '🥺', label: 'Missing you more' },
+    { emoji: '🫂', label: 'Wish you were here' },
+    { emoji: '⏳', label: 'Counting down to see you' },
+    { emoji: '❤️', label: 'Always in my heart' },
+  ],
+  hug: [
+    { emoji: '🫂', label: 'Warm hug for you' },
+    { emoji: '💖', label: 'Arms around you' },
+    { emoji: '💕', label: 'Squeezing you tight' },
+    { emoji: '🥺', label: 'Always here for you' },
+  ],
+  thinking: [
+    { emoji: '🥰', label: 'Always on my mind too' },
+    { emoji: '💓', label: 'My heart beats for you' },
+    { emoji: '✨', label: 'You made me smile' },
+    { emoji: '💍', label: 'Love you forever' },
+  ],
+  heartbeat: [
+    { emoji: '💓', label: 'Felt your heartbeat!' },
+    { emoji: '💖', label: 'Love you forever' },
+    { emoji: '🥰', label: 'You made my day' },
+    { emoji: '🫂', label: 'Holding you close' },
+  ],
+  default: [
+    { emoji: '💖', label: 'Love you forever' },
+    { emoji: '🥰', label: 'You made my day' },
+    { emoji: '🫂', label: 'Holding you close' },
+    { emoji: '✨', label: 'Thinking of you too' },
+  ],
+};
+
+function getRepliesForPing(tag) {
+  if (!tag) return DYNAMIC_REPLIES.default;
+  const lower = tag.toLowerCase();
+  if (lower.includes('call')) return DYNAMIC_REPLIES.call;
+  if (lower.includes('night')) return DYNAMIC_REPLIES.night;
+  if (lower.includes('morning')) return DYNAMIC_REPLIES.morning;
+  if (lower.includes('missing')) return DYNAMIC_REPLIES.missing;
+  if (lower.includes('hug')) return DYNAMIC_REPLIES.hug;
+  if (lower.includes('thinking')) return DYNAMIC_REPLIES.thinking;
+  if (lower.includes('heartbeat')) return DYNAMIC_REPLIES.heartbeat;
+  return DYNAMIC_REPLIES.default;
+}
 
 export default function App() {
   const [role, setRole] = useState(() => localStorage.getItem('bubulink_role'));
@@ -657,9 +714,9 @@ export default function App() {
             )}
           </div>
 
-          {/* Quick 2x2 Clean Reply Grid (Zero horizontal clipping!) */}
+          {/* Quick 2x2 Dynamic Reply Grid */}
           <div className="quick-replies-grid">
-            {QUICK_REPLIES.map((r) => {
+            {getRepliesForPing(latestPartnerPing.tag).map((r) => {
               const isSelected = latestPartnerPing.reaction === r.label;
               return (
                 <button
