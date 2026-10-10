@@ -109,10 +109,15 @@ export async function registerPushWithVPS(role) {
     let subscription = await targetReg.pushManager.getSubscription();
     if (!subscription) {
       const convertedVapidKey = urlBase64ToUint8Array(PUBLIC_VAPID_KEY);
-      subscription = await targetReg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: convertedVapidKey,
-      });
+      subscription = await Promise.race([
+        targetReg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertedVapidKey,
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Apple Push subscription timed out. Note: Apple APNs does not work inside the Xcode Mac Simulator. Please test on a real physical iPhone!')), 4500)
+        )
+      ]);
     }
 
     // Post subscription to VPS backend
