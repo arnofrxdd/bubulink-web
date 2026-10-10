@@ -158,6 +158,8 @@ export default function App() {
   const heartElemRef = useRef(null);
   const heartCenterRef = useRef({ x: 0, y: 0 });
   const touchStartPosRef = useRef({ x: 0, y: 0 });
+  const isTouchDeviceRef = useRef(false);
+  const lastPingTimestampRef = useRef(0);
   const lastPingIdRef = useRef(null);
   const lastReactionRef = useRef(null);
 
@@ -367,6 +369,13 @@ export default function App() {
   const fireHeartbeatPing = async () => {
     if (!role) return;
 
+    const now = Date.now();
+    if (now - lastPingTimestampRef.current < 700) {
+      console.log('Debouncing duplicate heartbeat');
+      return;
+    }
+    lastPingTimestampRef.current = now;
+
     if (!notifGranted) {
       registerPushWithVPS(role).then((res) => {
         if (res.success) setNotifGranted(true);
@@ -408,6 +417,13 @@ export default function App() {
   // SEND VIBE PING (Selected via Action Ribbon)
   const fireVibePing = async (vibe) => {
     if (!role || !vibe) return;
+
+    const now = Date.now();
+    if (now - lastPingTimestampRef.current < 700) {
+      console.log('Debouncing duplicate vibe ping');
+      return;
+    }
+    lastPingTimestampRef.current = now;
 
     if (!notifGranted) {
       registerPushWithVPS(role).then((res) => {
@@ -480,6 +496,12 @@ export default function App() {
 
   // ================= APPLE-GRADE CIRCULAR RADIAL GESTURE =================
   const handleTouchStart = (e) => {
+    if (e.type === 'touchstart') {
+      isTouchDeviceRef.current = true;
+    } else if (e.type === 'mousedown' && isTouchDeviceRef.current) {
+      return; // Ignore synthetic mouse event on touch devices
+    }
+
     const touch = e.touches ? e.touches[0] : e;
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
     isHoldingRef.current = false;
@@ -502,6 +524,7 @@ export default function App() {
   };
 
   const handleTouchMove = (e) => {
+    if (e.type === 'mousemove' && isTouchDeviceRef.current) return;
     if (!isHoldingRef.current) return;
 
     const touch = e.touches ? e.touches[0] : e;
@@ -522,7 +545,11 @@ export default function App() {
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e) => {
+    if (e && e.type === 'mouseup' && isTouchDeviceRef.current) {
+      return; // Ignore synthetic mouseup
+    }
+
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
@@ -530,13 +557,12 @@ export default function App() {
 
     if (isHoldingRef.current) {
       // User held and released on a vibe
-      if (selectedVibeIndex !== null && VIBE_OPTIONS[selectedVibeIndex]) {
-        fireVibePing(VIBE_OPTIONS[selectedVibeIndex]);
-      }
+      const targetVibe = VIBE_OPTIONS[selectedVibeIndex] || VIBE_OPTIONS[0];
+      fireVibePing(targetVibe);
       setIsHolding(false);
       isHoldingRef.current = false;
     } else {
-      // User quick-tapped (< 240ms)
+      // User quick-tapped (< 220ms)
       fireHeartbeatPing();
     }
   };
