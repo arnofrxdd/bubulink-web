@@ -682,9 +682,9 @@ export default function App() {
         {/* Minimal Vibe Preview & Radial Orbit */}
         {isHolding && (
           <>
-            {/* Minimal Clean Label Floating Above */}
+            {/* Minimal Clean Label Floating Above Orbit Ring */}
             <div className="minimal-vibe-label animate-fade-in">
-              <span className="vibe-label-text">{activeVibe.label}</span>
+              <span className="vibe-label-text">{activeVibe.emoji} {activeVibe.label}</span>
             </div>
 
             {/* Clean Orbit Ring */}

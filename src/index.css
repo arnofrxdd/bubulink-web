@@ -591,10 +591,10 @@ body {
   width: 100%;
 }
 
-/* MINIMAL FLOATING VIBE LABEL */
+/* MINIMAL FLOATING VIBE LABEL (ELEVATED ABOVE TOP ORB) */
 .minimal-vibe-label {
   position: absolute;
-  bottom: calc(50% + 110px);
+  bottom: calc(50% + 175px);
   left: 50%;
   transform: translateX(-50%);
   padding: 6px 16px;
