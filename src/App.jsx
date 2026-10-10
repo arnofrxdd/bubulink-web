@@ -161,18 +161,32 @@ export default function App() {
   const handleEnableNotifs = async () => {
     playChimeSound();
     const currentRole = localStorage.getItem('bubulink_role') || role || 'arnav';
+
+    if ('Notification' in window && Notification.permission === 'denied') {
+      alert('⚠️ Notifications are blocked in your iPhone Settings!\n\nPlease open your iPhone Settings > Notifications > BubuLink and turn "Allow Notifications" ON.');
+      return;
+    }
+
     const res = await registerPushWithVPS(currentRole);
     if (res.success) {
       setNotifGranted(true);
-      showSystemNotification('🔔 Alerts Active!', 'Your phone is connected for lock-screen push!');
+      showSystemNotification('🔔 Alerts Active!', `Your phone is connected as ${currentRole === 'zenah' ? 'Zenah' : 'Arnav'}!`);
     } else {
-      alert(res.reason || 'Please allow notifications in Safari settings');
+      alert(res.reason || 'Please tap Allow when iOS prompts for notifications.');
     }
   };
 
   // SEND 1-TAP DEFAULT HEARTBEAT (Instant Click)
   const fireHeartbeatPing = async () => {
     if (!role) return;
+
+    // Auto-attempt push registration on this direct user gesture if not granted yet
+    if (!notifGranted) {
+      registerPushWithVPS(role).then((res) => {
+        if (res.success) setNotifGranted(true);
+      });
+    }
+
     setHeartPulsing(true);
     setTimeout(() => setHeartPulsing(false), 800);
 
@@ -456,6 +470,18 @@ export default function App() {
           <span>{notifGranted ? 'Alerts ON' : 'Enable'}</span>
         </button>
       </header>
+
+      {/* PROMINENT NOTIFICATION BANNER IF NOT YET GRANTED */}
+      {!notifGranted && (
+        <button className="activate-alerts-banner animate-bounce-in" onClick={handleEnableNotifs}>
+          <span className="banner-bell-icon">🔔</span>
+          <div className="banner-bell-text">
+            <strong>Tap to Enable Notifications ⚡</strong>
+            <small>Required to get {partnerName}'s lock-screen pings</small>
+          </div>
+          <span className="banner-tap-arrow">Allow</span>
+        </button>
+      )}
 
       {/* PARTNER'S LATEST INCOMING PING (Floating Pill) */}
       {latestPartnerPing && (
