@@ -27,10 +27,10 @@
     <script type="module" src="./src/main.jsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(err => {
-            console.log('SW registration notice: ', err);
-          });
+        navigator.serviceWorker.register('./sw.js', { scope: './' }).then(reg => {
+          console.log('SW registered:', reg.scope);
+        }).catch(err => {
+          console.error('SW registration notice: ', err);
         });
       }
     </script>

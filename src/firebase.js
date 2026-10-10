@@ -73,28 +73,43 @@ export async function registerPushWithVPS(role) {
   }
 
   try {
-    const registration = await navigator.serviceWorker.ready;
+    // 1. Get or register ServiceWorker directly
+    let registration = await navigator.serviceWorker.getRegistration();
+    if (!registration) {
+      registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+    }
+
+    // Safety timeout: never hang forever waiting for ready
+    const readyRegistration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Service worker timeout')), 3500))
+    ]).catch(() => registration);
+
+    const targetReg = readyRegistration || registration;
 
     if (!('PushManager' in window)) {
       const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
       if (!isStandalone) {
         return { 
           success: false, 
-          reason: 'iOS requires adding to Home Screen for lock-screen push. Tap Safari Share (⬆️) > Add to Home Screen!' 
+          reason: 'Apple requires opening from Home Screen. Tap Safari Share (⬆️) > Add to Home Screen!' 
         };
       }
-      return { success: false, reason: 'PushManager not available on this device' };
+      return { success: false, reason: 'PushManager is not available on this device' };
     }
 
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
-      return { success: false, reason: 'Notification permission denied. Please allow notifications.' };
+      return { 
+        success: false, 
+        reason: 'Notification permission not granted. Please allow notifications in iPhone Settings > Notifications > BubuLink.' 
+      };
     }
 
-    let subscription = await registration.pushManager.getSubscription();
+    let subscription = await targetReg.pushManager.getSubscription();
     if (!subscription) {
       const convertedVapidKey = urlBase64ToUint8Array(PUBLIC_VAPID_KEY);
-      subscription = await registration.pushManager.subscribe({
+      subscription = await targetReg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: convertedVapidKey,
       });
@@ -115,7 +130,7 @@ export async function registerPushWithVPS(role) {
     return { success: true, role };
   } catch (err) {
     console.error('Push registration error:', err);
-    return { success: false, reason: err.message };
+    return { success: false, reason: err.message || 'Push registration failed' };
   }
 }
 

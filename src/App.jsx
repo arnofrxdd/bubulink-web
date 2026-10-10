@@ -51,6 +51,7 @@ export default function App() {
   const [newNoteText, setNewNoteText] = useState('');
   const [toastAlert, setToastAlert] = useState(null);
   const [showDrawer, setShowDrawer] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
 
   // iOS Safari Standalone Detection Gate
   const [isStandalone, setIsStandalone] = useState(true);
@@ -160,19 +161,28 @@ export default function App() {
 
   const handleEnableNotifs = async () => {
     playChimeSound();
+    setIsSubscribing(true);
     const currentRole = localStorage.getItem('bubulink_role') || role || 'arnav';
 
     if ('Notification' in window && Notification.permission === 'denied') {
+      setIsSubscribing(false);
       alert('⚠️ Notifications are blocked in your iPhone Settings!\n\nPlease open your iPhone Settings > Notifications > BubuLink and turn "Allow Notifications" ON.');
       return;
     }
 
-    const res = await registerPushWithVPS(currentRole);
-    if (res.success) {
-      setNotifGranted(true);
-      showSystemNotification('🔔 Alerts Active!', `Your phone is connected as ${currentRole === 'zenah' ? 'Zenah' : 'Arnav'}!`);
-    } else {
-      alert(res.reason || 'Please tap Allow when iOS prompts for notifications.');
+    try {
+      const res = await registerPushWithVPS(currentRole);
+      setIsSubscribing(false);
+      if (res.success) {
+        setNotifGranted(true);
+        confetti({ particleCount: 35, spread: 60 });
+        showSystemNotification('🔔 Alerts Active!', `Your phone is now registered as ${currentRole === 'zenah' ? 'Zenah' : 'Arnav'}!`);
+      } else {
+        alert(res.reason || 'Please tap Allow when iOS prompts for notifications.');
+      }
+    } catch (err) {
+      setIsSubscribing(false);
+      alert('Error: ' + err.message);
     }
   };
 
@@ -473,13 +483,17 @@ export default function App() {
 
       {/* PROMINENT NOTIFICATION BANNER IF NOT YET GRANTED */}
       {!notifGranted && (
-        <button className="activate-alerts-banner animate-bounce-in" onClick={handleEnableNotifs}>
+        <button 
+          className="activate-alerts-banner animate-bounce-in" 
+          onClick={handleEnableNotifs}
+          disabled={isSubscribing}
+        >
           <span className="banner-bell-icon">🔔</span>
           <div className="banner-bell-text">
-            <strong>Tap to Enable Notifications ⚡</strong>
+            <strong>{isSubscribing ? 'Connecting...' : 'Tap to Enable Notifications ⚡'}</strong>
             <small>Required to get {partnerName}'s lock-screen pings</small>
           </div>
-          <span className="banner-tap-arrow">Allow</span>
+          <span className="banner-tap-arrow">{isSubscribing ? '⏳' : 'Allow'}</span>
         </button>
       )}
 
