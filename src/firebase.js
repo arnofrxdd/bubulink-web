@@ -23,10 +23,11 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
 const COLLECTION = 'pings';
+const NOTES_DOC = 'daily_note';
 
 // Your VPS Push Endpoint & Public VAPID Key
-const VPS_API_BASE = 'https://bubu.arnavcloud.co.in';
-const PUBLIC_VAPID_KEY = 'BIGU4TdmKPx9RsHIzMBE6TnX0DE-749m07zGeIXT_ZROr89gTAyjT8BovtUjRWsRmAv8wZiDER4tcBN0-7FcJQ0';
+export const VPS_API_BASE = 'https://bubu.arnavcloud.co.in';
+export const PUBLIC_VAPID_KEY = 'BIGU4TdmKPx9RsHIzMBE6TnX0DE-749m07zGeIXT_ZROr89gTAyjT8BovtUjRWsRmAv8wZiDER4tcBN0-7FcJQ0';
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -65,20 +66,32 @@ export function playChimeSound() {
   } catch (e) {}
 }
 
-// Request Notification Permission and register with VPS Web Push
+// Register Apple Web Push subscription with VPS
 export async function registerPushWithVPS(role) {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.log('Push messaging is not supported on this browser/environment');
-    return false;
+  if (!('serviceWorker' in navigator)) {
+    return { success: false, reason: 'ServiceWorker not supported in this browser' };
   }
 
   try {
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return false;
-
     const registration = await navigator.serviceWorker.ready;
-    let subscription = await registration.pushManager.getSubscription();
 
+    if (!('PushManager' in window)) {
+      const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+      if (!isStandalone) {
+        return { 
+          success: false, 
+          reason: 'iOS requires adding to Home Screen for lock-screen push. Tap Safari Share (⬆️) > Add to Home Screen!' 
+        };
+      }
+      return { success: false, reason: 'PushManager not available on this device' };
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      return { success: false, reason: 'Notification permission denied. Please allow notifications.' };
+    }
+
+    let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       const convertedVapidKey = urlBase64ToUint8Array(PUBLIC_VAPID_KEY);
       subscription = await registration.pushManager.subscribe({
@@ -87,8 +100,8 @@ export async function registerPushWithVPS(role) {
       });
     }
 
-    // Send subscription to VPS backend
-    await fetch(`${VPS_API_BASE}/api/subscribe`, {
+    // Post subscription to VPS backend
+    const res = await fetch(`${VPS_API_BASE}/api/subscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -97,18 +110,19 @@ export async function registerPushWithVPS(role) {
       }),
     });
 
-    console.log(`✅ Push subscription registered with VPS for role: ${role}`);
-    return true;
+    const data = await res.json();
+    console.log(`✅ [BubuLink] Push registered on VPS for ${role}:`, data);
+    return { success: true, role };
   } catch (err) {
-    console.warn('Push registration note:', err);
-    return false;
+    console.error('Push registration error:', err);
+    return { success: false, reason: err.message };
   }
 }
 
-// Dispatch Apple Web Push via VPS to partner
+// Dispatch Apple Web Push via VPS to target
 export async function dispatchVPSPush(targetRole, title, body) {
   try {
-    await fetch(`${VPS_API_BASE}/api/push`, {
+    const res = await fetch(`${VPS_API_BASE}/api/push`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -117,9 +131,12 @@ export async function dispatchVPSPush(targetRole, title, body) {
         body,
       }),
     });
-    console.log(`⚡ Dispatched push to ${targetRole} via VPS`);
+    const result = await res.json();
+    console.log(`⚡ Dispatched push to ${targetRole} via VPS:`, result);
+    return result;
   } catch (err) {
-    console.warn('VPS push dispatch note:', err);
+    console.warn('VPS push dispatch notice:', err);
+    return { error: err.message };
   }
 }
 
@@ -137,18 +154,19 @@ export function showSystemNotification(title, body) {
   );
 }
 
-// Send a new cute ping to Firestore & VPS Push
+// Send a new ping to Firestore & trigger VPS Push to partner
 export async function sendPingToFirestore(ping) {
   try {
     const docRef = doc(db, COLLECTION, ping.id);
     await setDoc(docRef, ping);
 
-    // Also trigger VPS Apple Web Push to Arnav!
-    dispatchVPSPush(
-      'arnav',
-      `🌸 Zenah Spotted Something Cute! (${ping.emoji})`,
-      ping.message
-    );
+    const targetRole = ping.sender === 'zenah' ? 'arnav' : 'zenah';
+    const senderName = ping.sender === 'zenah' ? 'Zenah' : 'Arnav';
+    const title = `${ping.emoji} ${senderName}: ${ping.tag}`;
+    const body = ping.message || 'Sent you a love ping!';
+
+    // Dispatch real lock-screen push to partner
+    dispatchVPSPush(targetRole, title, body);
     return true;
   } catch (err) {
     console.error('Error sending ping to Firestore:', err);
@@ -156,21 +174,22 @@ export async function sendPingToFirestore(ping) {
   }
 }
 
-// React to a ping & trigger VPS Push to Zenah
-export async function reactToPingInFirestore(pingId, reaction) {
+// React to a ping & trigger VPS Push back to original sender
+export async function reactToPingInFirestore(pingId, reaction, responderRole, originalSender) {
   try {
     const docRef = doc(db, COLLECTION, pingId);
     await updateDoc(docRef, {
       reaction,
+      responderRole,
       reactionTimestamp: new Date().toISOString(),
     });
 
-    // Also trigger VPS Apple Web Push to Zenah!
-    dispatchVPSPush(
-      'zenah',
-      '💖 Arnav Replied to Your Ping!',
-      `Your husband reacted: ${reaction}`
-    );
+    const targetRole = originalSender || (responderRole === 'arnav' ? 'zenah' : 'arnav');
+    const responderName = responderRole === 'arnav' ? 'Arnav' : 'Zenah';
+    const title = `💖 ${responderName} Replied!`;
+    const body = `${responderName}: ${reaction}`;
+
+    dispatchVPSPush(targetRole, title, body);
     return true;
   } catch (err) {
     console.error('Error reacting in Firestore:', err);
@@ -184,11 +203,95 @@ export function subscribeToPings(callback) {
   return onSnapshot(colRef, (snapshot) => {
     const list = [];
     snapshot.forEach((doc) => {
-      list.push({ id: doc.id, ...doc.data() });
+      // Don't include the daily_note document in the pings list
+      if (doc.id !== NOTES_DOC) {
+        list.push({ id: doc.id, ...doc.data() });
+      }
     });
     list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     callback(list);
   }, (err) => {
-    console.warn('Firestore snapshot notice:', err);
+    console.warn('Firestore pings snapshot notice:', err);
+  });
+}
+
+// Daily Sticky Love Note listener
+export function subscribeToDailyNote(callback) {
+  const docRef = doc(db, COLLECTION, NOTES_DOC);
+  return onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data());
+    } else {
+      callback(null);
+    }
+  }, (err) => {
+    console.warn('Firestore note snapshot notice:', err);
+  });
+}
+
+// Update Daily Sticky Love Note
+export async function saveDailyNote(noteData) {
+  try {
+    const docRef = doc(db, COLLECTION, NOTES_DOC);
+    await setDoc(docRef, noteData, { merge: true });
+
+    const targetRole = noteData.author === 'zenah' ? 'arnav' : 'zenah';
+    const authorName = noteData.author === 'zenah' ? 'Zenah' : 'Arnav';
+    dispatchVPSPush(
+      targetRole,
+      `💌 New Love Note from ${authorName}`,
+      noteData.content
+    );
+    return true;
+  } catch (err) {
+    console.error('Error saving daily note:', err);
+    return false;
+  }
+}
+
+// Heart the Daily Note
+export async function heartDailyNote(readerRole) {
+  try {
+    const docRef = doc(db, COLLECTION, NOTES_DOC);
+    await updateDoc(docRef, {
+      lovedBy: readerRole,
+      lovedAt: new Date().toISOString(),
+    });
+    return true;
+  } catch (err) {
+    console.error('Error hearting note:', err);
+    return false;
+  }
+}
+
+// Image compression utility for photos (keeps Firestore docs tiny & fast < 100KB)
+export function compressImage(file, maxWidth = 800, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = reject;
+      img.src = event.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
 }

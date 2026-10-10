@@ -1,4 +1,4 @@
-// Service Worker for BubuLink Web Push & Caching
+// Service Worker for BubuLink Web Push & PWA Caching
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
@@ -8,7 +8,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: '🌸 BubuLink Ping', body: 'Zenah spotted something cute!' };
+  let data = { title: '💖 BubuLink Alert', body: 'New moment from your partner!' };
   try {
     if (event.data) {
       data = event.data.json();
@@ -36,15 +36,16 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const targetUrl = self.registration.scope || '/';
   event.waitUntil(
-    self.clients.matchAll({ type: 'window' }).then((clientList) => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url === '/' && 'focus' in client) {
+        if ('focus' in client) {
           return client.focus();
         }
       }
       if (self.clients.openWindow) {
-        return self.clients.openWindow('/');
+        return self.clients.openWindow(targetUrl);
       }
     })
   );
