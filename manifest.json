@@ -1,11 +1,11 @@
 {
-  "name": "BubuLink 🦢",
+  "name": "BubuLink",
   "short_name": "BubuLink",
   "description": "Private Couple Portal for Zenah & Arnav",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#FDFBF7",
-  "theme_color": "#DE7C8C",
+  "background_color": "#131118",
+  "theme_color": "#E55675",
   "icons": [
     {
       "src": "icon-192.png",
