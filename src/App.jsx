@@ -11,7 +11,9 @@ import {
   ChevronDown,
   Share,
   PlusSquare,
-  Sparkles
+  Sparkles,
+  Send,
+  Clock
 } from 'lucide-react';
 import { 
   sendPingToFirestore, 
@@ -25,18 +27,48 @@ import {
   registerPushWithVPS
 } from './firebase';
 
-const RADIAL_VIBES = [
-  { id: 'thinking', emoji: '💖', label: 'Thinking of You', msg: "Just wanted to remind you how deeply I love you. You're on my mind ❤️" },
-  { id: 'missing', emoji: '🥺', label: 'Missing You', msg: 'Missing your presence, your voice, and holding you close to me right now.' },
-  { id: 'hug', emoji: '🫂', label: 'Need a Hug', msg: 'Sending you the warmest, tightest hug. Wish I could hold you in my arms right now.' },
-  { id: 'call', emoji: '📞', label: 'Call Me Soon', msg: "Call me whenever you're free, I'd love to hear your voice." },
-  { id: 'night', emoji: '🌙', label: 'Goodnight', msg: "Goodnight my love. Rest peacefully, you're the last thing on my mind tonight 🌙❤️" },
-  { id: 'morning', emoji: '☀️', label: 'Good Morning', msg: 'Good morning sunshine! Hope your day is as bright and lovely as you are ☀️🌸' },
+const VIBE_OPTIONS = [
+  { 
+    id: 'thinking', 
+    emoji: '💖', 
+    label: 'Thinking of You', 
+    msg: "Just wanted to remind you how deeply I love you. You're always on my mind ❤️" 
+  },
+  { 
+    id: 'missing', 
+    emoji: '🥺', 
+    label: 'Missing You', 
+    msg: "Missing your warmth, your voice, and holding you close to me right now." 
+  },
+  { 
+    id: 'hug', 
+    emoji: '🫂', 
+    label: 'Need a Hug', 
+    msg: "Sending you the warmest, tightest hug. Wish I could hold you in my arms right now." 
+  },
+  { 
+    id: 'call', 
+    emoji: '📞', 
+    label: 'Call Me Soon', 
+    msg: "Call me whenever you're free, I'd love to hear your voice." 
+  },
+  { 
+    id: 'night', 
+    emoji: '🌙', 
+    label: 'Goodnight', 
+    msg: "Goodnight my love. Rest peacefully, you're the last thing on my mind tonight 🌙❤️" 
+  },
+  { 
+    id: 'morning', 
+    emoji: '☀️', 
+    label: 'Good Morning', 
+    msg: "Good morning sunshine! Hope your day is as bright and lovely as you are ☀️🌸" 
+  },
 ];
 
 const QUICK_REPLIES = [
   { emoji: '💖', label: 'Love you forever' },
-  { emoji: '📞', label: 'Calling you right now' },
+  { emoji: '📞', label: 'Calling right now' },
   { emoji: '🫂', label: 'Holding you close' },
   { emoji: '🥰', label: 'You made my day' },
 ];
@@ -52,6 +84,8 @@ export default function App() {
   const [toastAlert, setToastAlert] = useState(null);
   const [showDrawer, setShowDrawer] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
+  const [updateNotice, setUpdateNotice] = useState(null);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
 
   // iOS Safari Standalone Detection Gate
   const [isStandalone, setIsStandalone] = useState(true);
@@ -59,12 +93,13 @@ export default function App() {
 
   // Gesture state for Center Smart Heart
   const [isHolding, setIsHolding] = useState(false);
-  const [selectedVibeIndex, setSelectedVibeIndex] = useState(null);
+  const [selectedVibeIndex, setSelectedVibeIndex] = useState(0);
   const [heartPulsing, setHeartPulsing] = useState(false);
 
   const holdTimerRef = useRef(null);
-  const heartCenterRef = useRef({ x: 0, y: 0 });
-  const heartElemRef = useRef(null);
+  const isHoldingRef = useRef(false);
+  const touchStartPosRef = useRef({ x: 0, y: 0 });
+  const dockElemRef = useRef(null);
   const lastPingIdRef = useRef(null);
   const lastReactionRef = useRef(null);
 
@@ -72,14 +107,98 @@ export default function App() {
   const partnerName = role === 'zenah' ? 'Arnav' : 'Zenah';
   const myName = role === 'zenah' ? 'Zenah' : 'Arnav';
 
-  // Check iOS standalone mode on mount
+  // ================= 1. BULLETPROOF AUTO-UPDATE ENGINE =================
+  const checkForUpdates = async (isManual = false) => {
+    if (isCheckingUpdate) return;
+    setIsCheckingUpdate(true);
+    try {
+      const res = await fetch(`./version.json?_t=${Date.now()}`, { 
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const storedBuild = localStorage.getItem('bubulink_build_id');
+        
+        if (storedBuild && data.build && Number(data.build) > Number(storedBuild)) {
+          setUpdateNotice('Updating to latest version... ✨');
+          localStorage.setItem('bubulink_build_id', String(data.build));
+          
+          // Purge CacheStorage caches
+          if ('caches' in window) {
+            const cacheKeys = await caches.keys();
+            await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+          }
+
+          // Invalidate Service Worker
+          if ('serviceWorker' in navigator) {
+            const reg = await navigator.serviceWorker.getRegistration();
+            if (reg) {
+              if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+              await reg.update();
+            }
+          }
+
+          // Reload with fresh timestamp parameter
+          setTimeout(() => {
+            window.location.replace(window.location.pathname + '?_v=' + data.build);
+          }, 800);
+          return;
+        } else if (data.build && !storedBuild) {
+          localStorage.setItem('bubulink_build_id', String(data.build));
+        }
+
+        if (isManual) {
+          setToastAlert({ title: '✨ App Up to Date', body: `Running latest version (${data.version || '2.0'}).` });
+          setTimeout(() => setToastAlert(null), 3000);
+        }
+      }
+    } catch (err) {
+      console.warn('Update check error:', err);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
+  useEffect(() => {
+    // Check immediately on app boot
+    checkForUpdates();
+
+    // Check periodically every 20 seconds
+    const interval = setInterval(() => {
+      checkForUpdates();
+    }, 20000);
+
+    // Check whenever app resumes from background / phone is unlocked
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkForUpdates();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+
+    // Reload if service worker updates controller
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+      });
+    }
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+    };
+  }, []);
+
+  // iOS Standalone Detection on mount
   useEffect(() => {
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const standaloneMode = window.navigator.standalone === true || 
       window.matchMedia('(display-mode: standalone)').matches;
 
-    // Only force install screen if on iOS and NOT standalone
     if (isIOSDevice && !standaloneMode) {
       setIsStandalone(false);
     } else {
@@ -100,13 +219,13 @@ export default function App() {
     return () => window.removeEventListener('bubulink_alert', handleAlert);
   }, []);
 
-  // Listen to daily sticky note in real-time
+  // Real-time listener for daily sticky note
   useEffect(() => {
     const unsub = subscribeToDailyNote((note) => setDailyNote(note));
     return () => unsub();
   }, []);
 
-  // Listen to Firestore pings in real-time
+  // Real-time listener for Firestore pings
   useEffect(() => {
     const unsubscribe = subscribeToPings((list) => {
       if (list && list.length > 0) {
@@ -140,7 +259,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Auto-sync push registration on role change
+  // Auto-sync push registration when role changes
   useEffect(() => {
     const currentRole = localStorage.getItem('bubulink_role');
     if (currentRole) {
@@ -166,7 +285,7 @@ export default function App() {
 
     if ('Notification' in window && Notification.permission === 'denied') {
       setIsSubscribing(false);
-      alert('⚠️ Notifications are blocked in your iPhone Settings!\n\nPlease open your iPhone Settings > Notifications > BubuLink and turn "Allow Notifications" ON.');
+      alert('⚠️ Notifications are blocked in your iPhone Settings!\n\nPlease open iPhone Settings > Notifications > BubuLink and turn "Allow Notifications" ON.');
       return;
     }
 
@@ -175,7 +294,7 @@ export default function App() {
       setIsSubscribing(false);
       if (res.success) {
         setNotifGranted(true);
-        confetti({ particleCount: 35, spread: 60 });
+        confetti({ particleCount: 40, spread: 60 });
         showSystemNotification('🔔 Alerts Active!', `Your phone is now registered as ${currentRole === 'zenah' ? 'Zenah' : 'Arnav'}!`);
       } else {
         alert(res.reason || 'Please tap Allow when iOS prompts for notifications.');
@@ -190,7 +309,6 @@ export default function App() {
   const fireHeartbeatPing = async () => {
     if (!role) return;
 
-    // Auto-attempt push registration on this direct user gesture if not granted yet
     if (!notifGranted) {
       registerPushWithVPS(role).then((res) => {
         if (res.success) setNotifGranted(true);
@@ -201,15 +319,15 @@ export default function App() {
     setTimeout(() => setHeartPulsing(false), 800);
 
     if (navigator.vibrate) {
-      navigator.vibrate([50, 60, 50]);
+      navigator.vibrate([40, 50, 40]);
     }
     playChimeSound();
 
     confetti({
-      particleCount: 45,
-      spread: 60,
-      origin: { y: 0.5 },
-      colors: ['#E55675', '#FF758F', '#FFB3C1', '#FFFFFF'],
+      particleCount: 50,
+      spread: 70,
+      origin: { y: 0.55 },
+      colors: ['#FF3366', '#FF758F', '#FFB3C1', '#FFFFFF', '#D4AF37'],
     });
 
     const ping = {
@@ -229,20 +347,26 @@ export default function App() {
     showSystemNotification('💖 Heartbeat Sent!', `Delivered to ${partnerName}'s lock screen!`);
   };
 
-  // SEND RADIAL VIBE PING (Drag & Release)
-  const fireRadialPing = async (vibe) => {
+  // SEND VIBE PING (Selected via Action Ribbon)
+  const fireVibePing = async (vibe) => {
     if (!role || !vibe) return;
 
+    if (!notifGranted) {
+      registerPushWithVPS(role).then((res) => {
+        if (res.success) setNotifGranted(true);
+      });
+    }
+
     if (navigator.vibrate) {
-      navigator.vibrate([70, 80, 70]);
+      navigator.vibrate([60, 70, 60]);
     }
     playChimeSound();
 
     confetti({
-      particleCount: 50,
-      spread: 70,
+      particleCount: 60,
+      spread: 80,
       origin: { y: 0.5 },
-      colors: ['#E55675', '#D4AF37', '#FF758F', '#FFFFFF'],
+      colors: ['#FF3366', '#D4AF37', '#FF758F', '#FFFFFF'],
     });
 
     const ping = {
@@ -296,46 +420,40 @@ export default function App() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // ================= GESTURE HANDLERS FOR CENTER SMART HEART =================
+  // ================= APPLE-GRADE SMART GESTURE LOGIC =================
   const handleTouchStart = (e) => {
-    // Record center point of the heart on screen
-    if (heartElemRef.current) {
-      const rect = heartElemRef.current.getBoundingClientRect();
-      heartCenterRef.current = {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
-      };
-    }
+    const touch = e.touches ? e.touches[0] : e;
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    isHoldingRef.current = false;
 
-    // Set hold timer (260ms threshold for Hold vs Tap)
+    // 240ms threshold for press-and-hold vs tap
     holdTimerRef.current = setTimeout(() => {
+      isHoldingRef.current = true;
       setIsHolding(true);
-      if (navigator.vibrate) navigator.vibrate(40);
-    }, 260);
+      setSelectedVibeIndex(0);
+      if (navigator.vibrate) navigator.vibrate(35);
+    }, 240);
   };
 
   const handleTouchMove = (e) => {
-    if (!isHolding) return;
+    if (!isHoldingRef.current) return;
 
     const touch = e.touches ? e.touches[0] : e;
-    const dx = touch.clientX - heartCenterRef.current.x;
-    const dy = touch.clientY - heartCenterRef.current.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Calculate drag progress horizontally across the action ribbon
+    if (dockElemRef.current) {
+      const rect = dockElemRef.current.getBoundingClientRect();
+      const relativeX = touch.clientX - rect.left;
+      const progress = Math.max(0, Math.min(1, relativeX / rect.width));
+      const targetIndex = Math.min(
+        VIBE_OPTIONS.length - 1,
+        Math.floor(progress * VIBE_OPTIONS.length)
+      );
 
-    // If dragged outside the center deadzone (> 40px)
-    if (dist > 40) {
-      let angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI; // -180 to 180
-      // Normalize angle relative to top (-90deg is 0)
-      let normAngle = (angleDeg + 90 + 360) % 360;
-
-      // 6 vibes = 60 degrees each
-      let index = Math.round(normAngle / 60) % 6;
-      if (index !== selectedVibeIndex) {
-        setSelectedVibeIndex(index);
+      if (targetIndex !== selectedVibeIndex) {
+        setSelectedVibeIndex(targetIndex);
         if (navigator.vibrate) navigator.vibrate(20);
       }
-    } else {
-      setSelectedVibeIndex(null);
     }
   };
 
@@ -345,20 +463,20 @@ export default function App() {
       holdTimerRef.current = null;
     }
 
-    if (isHolding) {
-      // User held and released
-      if (selectedVibeIndex !== null && RADIAL_VIBES[selectedVibeIndex]) {
-        fireRadialPing(RADIAL_VIBES[selectedVibeIndex]);
+    if (isHoldingRef.current) {
+      // User held and released on a vibe
+      if (selectedVibeIndex !== null && VIBE_OPTIONS[selectedVibeIndex]) {
+        fireVibePing(VIBE_OPTIONS[selectedVibeIndex]);
       }
       setIsHolding(false);
-      setSelectedVibeIndex(null);
+      isHoldingRef.current = false;
     } else {
-      // User quick tapped
+      // User quick-tapped (< 240ms)
       fireHeartbeatPing();
     }
   };
 
-  // 1. SAFARI INSTALLATION GATE (Shown only in normal iOS Safari browser)
+  // 1. SAFARI INSTALLATION GATE (Shown only when in iOS Safari browser)
   if (!isStandalone && !dismissInstallGate) {
     return (
       <div className="install-gate-overlay">
@@ -409,7 +527,7 @@ export default function App() {
   if (!role) {
     return (
       <div className="app-container onboarding-screen">
-        <div className="onboarding-card">
+        <div className="onboarding-card animate-slide-in">
           <div className="app-icon-preview-glow">
             <img src="./apple-touch-icon.png" alt="BubuLink" className="app-icon-preview" />
           </div>
@@ -445,13 +563,22 @@ export default function App() {
   }
 
   const latestPartnerPing = pings.find(p => p.sender === partnerRole);
+  const activeVibe = VIBE_OPTIONS[selectedVibeIndex] || VIBE_OPTIONS[0];
 
   return (
     <div className="app-container smart-screen">
+      {/* Auto-Update Live Banner */}
+      {updateNotice && (
+        <div className="update-floating-notice animate-bounce-in">
+          <Sparkles size={14} className="sparkle-spin" />
+          <span>{updateNotice}</span>
+        </div>
+      )}
+
       {/* Floating In-App Toast */}
       {toastAlert && (
         <div className="toast-floating-banner animate-bounce-in" onClick={() => setToastAlert(null)}>
-          <div className="toast-icon">⚡</div>
+          <div className="toast-icon">✨</div>
           <div className="toast-text">
             <strong>{toastAlert.title}</strong>
             <p>{toastAlert.body}</p>
@@ -460,7 +587,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ULTRA-MINIMAL TOP BAR */}
+      {/* ULTRA-MINIMAL REFINED TOP BAR */}
       <header className="minimal-header">
         <button 
           className="user-pill-btn"
@@ -468,7 +595,16 @@ export default function App() {
         >
           <span className="user-pill-avatar">{role === 'zenah' ? '🌸' : '💍'}</span>
           <span className="user-pill-name">{myName}</span>
-          <RefreshCw size={12} className="switch-icon" />
+          <ChevronDown size={13} className="switch-icon" />
+        </button>
+
+        {/* Sync / Update Button */}
+        <button 
+          className={`sync-pill-btn ${isCheckingUpdate ? 'rotating' : ''}`}
+          onClick={() => checkForUpdates(true)}
+          title="Check for Updates"
+        >
+          <RefreshCw size={13} />
         </button>
 
         <button 
@@ -476,7 +612,7 @@ export default function App() {
           onClick={handleEnableNotifs}
           title="Notification Status"
         >
-          <Bell size={14} />
+          <Bell size={13} />
           <span>{notifGranted ? 'Alerts ON' : 'Enable'}</span>
         </button>
       </header>
@@ -497,7 +633,7 @@ export default function App() {
         </button>
       )}
 
-      {/* PARTNER'S LATEST INCOMING PING (Floating Pill) */}
+      {/* PARTNER'S LATEST INCOMING PING (Refined Floating Card with 2x2 Grid) */}
       {latestPartnerPing && (
         <div className="incoming-ping-pill animate-slide-in">
           <div className="incoming-ping-top">
@@ -506,10 +642,15 @@ export default function App() {
               <strong>{partnerName}: {latestPartnerPing.tag}</strong>
               <small>{formatTime(latestPartnerPing.timestamp)}</small>
             </div>
+            {latestPartnerPing.reaction && (
+              <span className="incoming-reacted-badge">
+                Replied: {latestPartnerPing.reaction}
+              </span>
+            )}
           </div>
 
-          {/* Quick 1-Tap Reactions Bar */}
-          <div className="quick-replies-row">
+          {/* Quick 2x2 Clean Reply Grid (Zero horizontal clipping!) */}
+          <div className="quick-replies-grid">
             {QUICK_REPLIES.map((r) => {
               const isSelected = latestPartnerPing.reaction === r.label;
               return (
@@ -518,8 +659,8 @@ export default function App() {
                   className={`reply-chip ${isSelected ? 'selected' : ''}`}
                   onClick={() => handleReact(latestPartnerPing.id, r.label, latestPartnerPing.sender)}
                 >
-                  <span>{r.emoji}</span>
-                  <span>{r.label}</span>
+                  <span className="chip-emoji">{r.emoji}</span>
+                  <span className="chip-label">{r.label}</span>
                 </button>
               );
             })}
@@ -527,39 +668,41 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= CENTER STAGE: THE SMART HEART ================= */}
+      {/* ================= CENTER STAGE: SCULPTED 3D HEART & ACTION DOCK ================= */}
       <div className="center-stage">
         
-        {/* Expanding Radial Halo of Vibes on Hold */}
+        {/* Apple Smart Action Ribbon (Blooms UPWARD above the heart into open space!) */}
         {isHolding && (
-          <div className="radial-halo-container">
-            {RADIAL_VIBES.map((v, i) => {
-              // Calculate circular coordinates: radius = 120px
-              const angleDeg = i * 60 - 90;
-              const angleRad = (angleDeg * Math.PI) / 180;
-              const x = Math.round(130 * Math.cos(angleRad));
-              const y = Math.round(130 * Math.sin(angleRad));
-              const isTargeted = selectedVibeIndex === i;
+          <div className="action-dock-container animate-spring-up">
+            {/* Live Message Preview Card */}
+            <div className="vibe-preview-card">
+              <span className="preview-emoji">{activeVibe.emoji}</span>
+              <div className="preview-text-block">
+                <strong>{activeVibe.label}</strong>
+                <p>“{activeVibe.msg}”</p>
+              </div>
+            </div>
 
-              return (
-                <div
-                  key={v.id}
-                  className={`radial-vibe-bubble ${isTargeted ? 'targeted' : ''}`}
-                  style={{
-                    transform: `translate(${x}px, ${y}px) scale(${isTargeted ? 1.3 : 1})`,
-                  }}
-                >
-                  <span className="radial-emoji">{v.emoji}</span>
-                  <span className="radial-label">{v.label}</span>
-                </div>
-              );
-            })}
+            {/* Glowing Frosted Glass Action Ribbon */}
+            <div ref={dockElemRef} className="action-dock-bar">
+              {VIBE_OPTIONS.map((v, i) => {
+                const isTargeted = selectedVibeIndex === i;
+                return (
+                  <div
+                    key={v.id}
+                    className={`dock-vibe-item ${isTargeted ? 'targeted' : ''}`}
+                  >
+                    <span className="dock-emoji">{v.emoji}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="dock-drag-hint">Slide finger across • Release to send</div>
           </div>
         )}
 
-        {/* The Sculptured Glowing Heart (Pure luxury 3D heart, not a circular ball) */}
+        {/* The Sculpted 3D Glowing Living Heart */}
         <div
-          ref={heartElemRef}
           className={`pure-heart-btn ${heartPulsing ? 'pulse-burst' : ''} ${isHolding ? 'holding-glow' : ''}`}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -568,75 +711,80 @@ export default function App() {
           onMouseMove={handleTouchMove}
           onMouseUp={handleTouchEnd}
         >
+          {/* Ambient layered atmospheric glows */}
           <div className="heart-ambient-light"></div>
+          <div className="heart-core-bloom"></div>
+
           <svg 
             className="pure-heart-svg" 
-            viewBox="0 0 220 200" 
+            viewBox="0 0 200 185" 
             xmlns="http://www.w3.org/2000/svg"
           >
             <defs>
-              <linearGradient id="heartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#FF758F" />
-                <stop offset="35%" stopColor="#FF3366" />
-                <stop offset="75%" stopColor="#D90429" />
-                <stop offset="100%" stopColor="#9B001F" />
+              <radialGradient id="heartDeepBody" cx="35%" cy="32%" r="72%">
+                <stop offset="0%" stopColor="#FFA1B5" />
+                <stop offset="18%" stopColor="#FF3366" />
+                <stop offset="55%" stopColor="#D90449" />
+                <stop offset="90%" stopColor="#80062C" />
+                <stop offset="100%" stopColor="#4A0218" />
+              </radialGradient>
+
+              <linearGradient id="heartSpecularSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.85" />
+                <stop offset="35%" stopColor="#FFFFFF" stopOpacity="0.25" />
+                <stop offset="85%" stopColor="#FFFFFF" stopOpacity="0" />
               </linearGradient>
 
-              <linearGradient id="heartSheen" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.55" />
-                <stop offset="60%" stopColor="#FFFFFF" stopOpacity="0.05" />
-                <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+              <linearGradient id="heartSubtleRim" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#FFC2D1" stopOpacity="0.9" />
+                <stop offset="100%" stopColor="#FF3366" stopOpacity="0.1" />
               </linearGradient>
 
-              <linearGradient id="innerShine" x1="30%" y1="0%" x2="70%" y2="100%">
-                <stop offset="0%" stopColor="#FFAEC0" stopOpacity="0.75" />
-                <stop offset="100%" stopColor="#FF3366" stopOpacity="0" />
-              </linearGradient>
-
-              <filter id="heartShadow" x="-30%" y="-30%" width="160%" height="160%">
-                <feDropShadow dx="0" dy="16" stdDeviation="22" floodColor="#FF3366" floodOpacity="0.55" />
-                <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#FF3366" floodOpacity="0.4" />
+              <filter id="heartShadowFilter" x="-40%" y="-40%" width="180%" height="180%">
+                <feDropShadow dx="0" dy="20" stdDeviation="28" floodColor="#FF3366" floodOpacity="0.65" />
+                <feDropShadow dx="0" dy="8" stdDeviation="12" floodColor="#FF758F" floodOpacity="0.45" />
               </filter>
             </defs>
 
-            {/* Glowing Drop Shadow layer */}
+            {/* Glowing Deep Aura Silhouette */}
             <path
-              d="M110 185 C110 185 15 125 15 62 C15 28 42 8 78 8 C98 8 106 18 110 24 C114 18 122 8 142 8 C178 8 205 28 205 62 C205 125 110 185 110 185 Z"
-              fill="url(#heartGradient)"
-              filter="url(#heartShadow)"
+              d="M100 168 C100 168 16 112 16 58 C16 26 38 8 70 8 C88 8 96 18 100 24 C104 18 112 8 130 8 C162 8 184 26 184 58 C184 112 100 168 100 168 Z"
+              fill="url(#heartDeepBody)"
+              filter="url(#heartShadowFilter)"
             />
 
-            {/* Sculptured Rich Heart Body */}
+            {/* Sculpted 3D Vector Heart Body */}
             <path
-              d="M110 180 C110 180 20 122 20 62 C20 31 45 12 78 12 C95 12 105 21 110 26 C115 21 125 12 142 12 C175 12 200 31 200 62 C200 122 110 180 110 180 Z"
-              fill="url(#heartGradient)"
+              d="M100 164 C100 164 20 110 20 58 C20 28 42 10 70 10 C86 10 95 19 100 25 C105 19 114 10 130 10 C158 10 180 28 180 58 C180 110 100 164 100 164 Z"
+              fill="url(#heartDeepBody)"
             />
 
-            {/* Top Left Curve Satin Highlight */}
+            {/* Silky Left Lobe Curvature Highlight */}
             <path
-              d="M78 14 C48 14 26 32 26 60 C26 90 54 126 88 150 C66 124 40 92 40 62 C40 38 56 22 78 22 C91 22 100 28 105 34 C103 26 93 14 78 14 Z"
-              fill="url(#heartSheen)"
+              d="M70 13 C46 13 26 29 26 54 C26 80 52 114 82 136 C62 112 38 82 38 56 C38 34 52 21 70 21 C82 21 90 27 95 33 C93 25 84 13 70 13 Z"
+              fill="url(#heartSpecularSheen)"
             />
 
-            {/* Upper Lobe Crest Glow */}
+            {/* Specular Crest Reflection */}
             <ellipse 
-              cx="72" 
-              cy="30" 
-              rx="26" 
-              ry="11" 
-              transform="rotate(-20 72 30)"
-              fill="url(#innerShine)" 
+              cx="66" 
+              cy="28" 
+              rx="22" 
+              ry="9" 
+              transform="rotate(-22 66 28)"
+              fill="url(#heartSubtleRim)" 
             />
           </svg>
         </div>
 
-        {/* Minimal Smart Gesture Hint */}
-        <div className="gesture-hint-text">
-          {isHolding 
-            ? (selectedVibeIndex !== null ? `Release to send ${RADIAL_VIBES[selectedVibeIndex].label}!` : 'Slide thumb to select vibe')
-            : 'Tap for heartbeat • Hold to slide vibe'
-          }
-        </div>
+        {/* Subtle Gesture Guidance (Visible only when not holding) */}
+        {!isHolding && (
+          <div className="gesture-hint-text">
+            <span>Tap for heartbeat</span>
+            <span className="dot-divider">•</span>
+            <span>Hold for vibes</span>
+          </div>
+        )}
       </div>
 
       {/* ================= BOTTOM DRAWER TRIGGER ================= */}
@@ -645,7 +793,7 @@ export default function App() {
           className="drawer-pill-btn"
           onClick={() => setShowDrawer(true)}
         >
-          <ChevronUp size={16} />
+          <ChevronUp size={15} />
           <span>Love Note & Moments 💌</span>
         </button>
       </footer>
@@ -665,7 +813,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* Daily Love Note Widget */}
+            {/* Daily Love Note Card */}
             <div className="drawer-note-card">
               <div className="drawer-note-top">
                 <span className="note-badge">TODAY'S NOTE</span>
@@ -691,109 +839,138 @@ export default function App() {
                 </span>
 
                 {dailyNote && (
-                  <div>
-                    {dailyNote.lovedBy ? (
-                      <span className="loved-tag">Loved by {dailyNote.lovedBy === 'zenah' ? 'Zenah' : 'Arnav'} ❤️</span>
-                    ) : (
-                      <button className="heart-action-btn" onClick={handleHeartNote}>
-                        <Heart size={13} />
-                        <span>Love this</span>
-                      </button>
-                    )}
-                  </div>
+                  <button 
+                    className={`note-heart-pill ${dailyNote.lovedBy?.includes(role) ? 'loved' : ''}`}
+                    onClick={handleHeartNote}
+                  >
+                    <Heart size={13} fill={dailyNote.lovedBy?.includes(role) ? '#FF3366' : 'none'} />
+                    <span>{dailyNote.lovedBy?.length || 0}</span>
+                  </button>
                 )}
               </div>
             </div>
 
-            {/* Timeline Moments Feed */}
-            <div className="drawer-timeline-section">
-              <h4>Recent Moments</h4>
-              {pings.length === 0 ? (
-                <div className="drawer-empty-state">No moments yet. Tap the heart to send one! 💖</div>
-              ) : (
-                <div className="drawer-pings-list">
-                  {pings.map((p) => (
-                    <div key={p.id} className="drawer-ping-item">
-                      <div className="ping-item-left">
-                        <span className="item-emoji">{p.emoji}</span>
-                        <div>
-                          <strong>{p.sender === 'zenah' ? 'Zenah' : 'Arnav'}</strong>
+            {/* Moments History Feed */}
+            <div className="drawer-history-section">
+              <div className="history-section-title">
+                <Clock size={13} />
+                <span>Today's Moments</span>
+              </div>
+
+              <div className="history-list">
+                {pings.length === 0 ? (
+                  <div className="history-empty">No moments yet today. Tap the heart to send one! 💕</div>
+                ) : (
+                  pings.slice(0, 15).map((p) => {
+                    const isMe = p.sender === role;
+                    return (
+                      <div key={p.id} className={`history-item ${isMe ? 'outgoing' : 'incoming'}`}>
+                        <span className="history-emoji">{p.emoji}</span>
+                        <div className="history-info">
+                          <strong>{isMe ? 'You' : partnerName}: {p.tag}</strong>
                           <p>{p.message}</p>
+                          <small>{formatTime(p.timestamp)}</small>
+                          {p.reaction && (
+                            <span className="history-reply-tag">
+                              💬 Replied: {p.reaction}
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <span className="item-time">{formatTime(p.timestamp)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================= MODALS ================= */}
-
-      {/* Write Daily Love Note Modal */}
-      {showNoteModal && (
-        <div className="modal-overlay" onClick={() => setShowNoteModal(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>💌 Write Today's Love Note</h3>
-              <button className="modal-close-x" onClick={() => setShowNoteModal(false)}>
-                <X size={16} />
-              </button>
-            </div>
-            <textarea
-              className="note-textarea"
-              rows={4}
-              placeholder="Good morning my lovely wife, kick ass today! Love you always..."
-              value={newNoteText}
-              onChange={(e) => setNewNoteText(e.target.value)}
-            />
-            <button className="modal-save-btn" onClick={handleSaveDailyNote}>
-              Save Note 💖
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Switch Role Modal */}
-      {showRoleModal && (
-        <div className="modal-overlay" onClick={() => setShowRoleModal(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Switch Profile 📱</h3>
-              <button className="modal-close-x" onClick={() => setShowRoleModal(false)}>
-                <X size={16} />
-              </button>
+                    );
+                  })
+                )}
+              </div>
             </div>
 
-            <div className="modal-roles-list">
+            {/* App Update & Build Info Footer */}
+            <div className="drawer-footer-actions">
               <button 
-                className={`modal-role-item ${role === 'zenah' ? 'selected' : ''}`}
+                className="force-update-btn"
+                onClick={() => checkForUpdates(true)}
+              >
+                <RefreshCw size={13} className={isCheckingUpdate ? 'rotating' : ''} />
+                <span>Check for Updates (v2.0)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= ROLE SWITCH MODAL ================= */}
+      {showRoleModal && (
+        <div className="modal-backdrop" onClick={() => setShowRoleModal(false)}>
+          <div className="modal-content animate-slide-in" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Switch Profile</h3>
+              <button className="modal-close-btn" onClick={() => setShowRoleModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="role-options-list">
+              <button 
+                className={`role-select-item ${role === 'zenah' ? 'active' : ''}`}
                 onClick={() => handleSelectRole('zenah')}
               >
-                <span>🌸 Zenah (The Wife)</span>
-                {role === 'zenah' && <CheckCircle2 size={18} className="check-icon" />}
+                <span className="role-avatar-sm">🌸</span>
+                <div className="role-meta">
+                  <strong>I'm the Wife</strong>
+                  <small>Zenah 👑</small>
+                </div>
+                {role === 'zenah' && <CheckCircle2 size={16} className="role-check" />}
               </button>
 
               <button 
-                className={`modal-role-item ${role === 'arnav' ? 'selected' : ''}`}
+                className={`role-select-item ${role === 'arnav' ? 'active' : ''}`}
                 onClick={() => handleSelectRole('arnav')}
               >
-                <span>💍 Arnav (The Husband)</span>
-                {role === 'arnav' && <CheckCircle2 size={18} className="check-icon" />}
+                <span className="role-avatar-sm">💍</span>
+                <div className="role-meta">
+                  <strong>I'm the Husband</strong>
+                  <small>Arnav 💖</small>
+                </div>
+                {role === 'arnav' && <CheckCircle2 size={16} className="role-check" />}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {/* ================= EDIT DAILY NOTE MODAL ================= */}
+      {showNoteModal && (
+        <div className="modal-backdrop" onClick={() => setShowNoteModal(false)}>
+          <div className="modal-content animate-slide-in" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Write Love Note 💌</h3>
+              <button className="modal-close-btn" onClick={() => setShowNoteModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <textarea 
+              className="note-textarea"
+              placeholder="Write a sweet romantic note for your love..."
+              value={newNoteText}
+              onChange={(e) => setNewNoteText(e.target.value)}
+              rows={4}
+              maxLength={280}
+            />
+
+            <div className="modal-actions">
               <button 
-                className="modal-role-item reset"
-                onClick={() => {
-                  localStorage.removeItem('bubulink_role');
-                  setRole(null);
-                  setShowRoleModal(false);
-                }}
+                className="cancel-btn"
+                onClick={() => setShowNoteModal(false)}
               >
-                🔄 Reset to Welcome Screen
+                Cancel
+              </button>
+              <button 
+                className="save-btn"
+                onClick={handleSaveDailyNote}
+                disabled={!newNoteText.trim()}
+              >
+                <Send size={14} />
+                <span>Save Note</span>
               </button>
             </div>
           </div>

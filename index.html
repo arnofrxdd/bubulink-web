@@ -6,7 +6,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="BubuLink" />
-    <meta name="theme-color" content="#0F0E13" />
+    <meta name="theme-color" content="#070709" />
+
+    <!-- Cache Busting Headers for Instant iOS PWA Updates -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
 
     <!-- Apple Touch Icons & Meta -->
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
@@ -26,11 +31,36 @@
     <div id="root"></div>
     <script type="module" src="./src/main.jsx"></script>
     <script>
+      // Auto-Updating Service Worker Engine
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js', { scope: './' }).then(reg => {
-          console.log('SW registered:', reg.scope);
-        }).catch(err => {
-          console.error('SW registration notice: ', err);
+        navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' })
+          .then(function(reg) {
+            console.log('[BubuLink] SW registered:', reg.scope);
+            // Proactively check for newer versions on every page load
+            reg.update();
+
+            reg.addEventListener('updatefound', function() {
+              const newWorker = reg.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', function() {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('[BubuLink] New update installed! Refreshing client...');
+                    window.location.reload();
+                  }
+                });
+              }
+            });
+          })
+          .catch(function(err) {
+            console.error('[BubuLink] SW registration notice: ', err);
+          });
+
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
         });
       }
     </script>
