@@ -26,19 +26,19 @@ import {
 } from './firebase';
 
 const RADIAL_VIBES = [
-  { id: 'missing', emoji: '🥺', label: 'Missing You', msg: 'Missing you so much right now. Thinking of you ❤️' },
-  { id: 'call', emoji: '📞', label: 'Call Me', msg: 'Are you free to talk? Ring me whenever you get this! 📞' },
-  { id: 'hug', emoji: '🫂', label: 'Need a Hug', msg: 'Feeling a little low... really need a tight hug from you 🫂' },
-  { id: 'safe', emoji: '🏡', label: 'Reached Home', msg: 'Just reached safely! All good here ✨' },
-  { id: 'night', emoji: '🌙', label: 'Goodnight', msg: 'Going to sleep now, love you to the moon and back! 🌙💤' },
-  { id: 'morning', emoji: '☀️', label: 'Good Morning', msg: 'Good morning my sunshine! Hope you have the best day ☀️🌸' },
+  { id: 'thinking', emoji: '💖', label: 'Thinking of You', msg: "Just wanted to remind you how deeply I love you. You're on my mind ❤️" },
+  { id: 'missing', emoji: '🥺', label: 'Missing You', msg: 'Missing your presence, your voice, and holding you close to me right now.' },
+  { id: 'hug', emoji: '🫂', label: 'Need a Hug', msg: 'Sending you the warmest, tightest hug. Wish I could hold you in my arms right now.' },
+  { id: 'call', emoji: '📞', label: 'Call Me Soon', msg: "Call me whenever you're free, I'd love to hear your voice." },
+  { id: 'night', emoji: '🌙', label: 'Goodnight', msg: "Goodnight my love. Rest peacefully, you're the last thing on my mind tonight 🌙❤️" },
+  { id: 'morning', emoji: '☀️', label: 'Good Morning', msg: 'Good morning sunshine! Hope your day is as bright and lovely as you are ☀️🌸' },
 ];
 
 const QUICK_REPLIES = [
-  { emoji: '📞', label: 'Calling in 5m' },
-  { emoji: '💖', label: 'Love you so much' },
-  { emoji: '🫂', label: 'Huge hug sent' },
-  { emoji: '🚗', label: 'On my way' },
+  { emoji: '💖', label: 'Love you forever' },
+  { emoji: '📞', label: 'Calling you right now' },
+  { emoji: '🫂', label: 'Holding you close' },
+  { emoji: '🥰', label: 'You made my day' },
 ];
 
 export default function App() {
@@ -218,7 +218,7 @@ export default function App() {
       recipient: partnerRole,
       tag: 'Heartbeat',
       emoji: '💖',
-      message: 'Thinking of you right now ❤️',
+      message: 'Sent you my heartbeat ❤️ Thinking of you.',
       timestamp: new Date().toISOString(),
       reaction: null,
       responderRole: null,
@@ -423,8 +423,8 @@ export default function App() {
             >
               <div className="role-avatar">🌸</div>
               <div className="role-info">
-                <h2>I'm Zenah 👑</h2>
-                <p>The Wife • Assam</p>
+                <h2>I'm the Wife</h2>
+                <p>Zenah 👑</p>
               </div>
             </button>
 
@@ -434,8 +434,8 @@ export default function App() {
             >
               <div className="role-avatar">💍</div>
               <div className="role-info">
-                <h2>I'm Arnav 💖</h2>
-                <p>The Husband • Standby</p>
+                <h2>I'm the Husband</h2>
+                <p>Arnav 💖</p>
               </div>
             </button>
           </div>
@@ -537,8 +537,8 @@ export default function App() {
               // Calculate circular coordinates: radius = 120px
               const angleDeg = i * 60 - 90;
               const angleRad = (angleDeg * Math.PI) / 180;
-              const x = Math.round(120 * Math.cos(angleRad));
-              const y = Math.round(120 * Math.sin(angleRad));
+              const x = Math.round(130 * Math.cos(angleRad));
+              const y = Math.round(130 * Math.sin(angleRad));
               const isTargeted = selectedVibeIndex === i;
 
               return (
@@ -557,10 +557,10 @@ export default function App() {
           </div>
         )}
 
-        {/* The Giant Tactile Heart */}
+        {/* The Sculptured Glowing Heart (Pure luxury 3D heart, not a circular ball) */}
         <div
           ref={heartElemRef}
-          className={`smart-heart-btn ${heartPulsing ? 'pulse-burst' : ''} ${isHolding ? 'holding-aura' : ''}`}
+          className={`pure-heart-btn ${heartPulsing ? 'pulse-burst' : ''} ${isHolding ? 'holding-glow' : ''}`}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -568,9 +568,65 @@ export default function App() {
           onMouseMove={handleTouchMove}
           onMouseUp={handleTouchEnd}
         >
-          <div className="heart-aura-layer"></div>
-          <svg className="heart-svg" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          <div className="heart-ambient-light"></div>
+          <svg 
+            className="pure-heart-svg" 
+            viewBox="0 0 220 200" 
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <linearGradient id="heartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#FF758F" />
+                <stop offset="35%" stopColor="#FF3366" />
+                <stop offset="75%" stopColor="#D90429" />
+                <stop offset="100%" stopColor="#9B001F" />
+              </linearGradient>
+
+              <linearGradient id="heartSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.55" />
+                <stop offset="60%" stopColor="#FFFFFF" stopOpacity="0.05" />
+                <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+              </linearGradient>
+
+              <linearGradient id="innerShine" x1="30%" y1="0%" x2="70%" y2="100%">
+                <stop offset="0%" stopColor="#FFAEC0" stopOpacity="0.75" />
+                <stop offset="100%" stopColor="#FF3366" stopOpacity="0" />
+              </linearGradient>
+
+              <filter id="heartShadow" x="-30%" y="-30%" width="160%" height="160%">
+                <feDropShadow dx="0" dy="16" stdDeviation="22" floodColor="#FF3366" floodOpacity="0.55" />
+                <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="#FF3366" floodOpacity="0.4" />
+              </filter>
+            </defs>
+
+            {/* Glowing Drop Shadow layer */}
+            <path
+              d="M110 185 C110 185 15 125 15 62 C15 28 42 8 78 8 C98 8 106 18 110 24 C114 18 122 8 142 8 C178 8 205 28 205 62 C205 125 110 185 110 185 Z"
+              fill="url(#heartGradient)"
+              filter="url(#heartShadow)"
+            />
+
+            {/* Sculptured Rich Heart Body */}
+            <path
+              d="M110 180 C110 180 20 122 20 62 C20 31 45 12 78 12 C95 12 105 21 110 26 C115 21 125 12 142 12 C175 12 200 31 200 62 C200 122 110 180 110 180 Z"
+              fill="url(#heartGradient)"
+            />
+
+            {/* Top Left Curve Satin Highlight */}
+            <path
+              d="M78 14 C48 14 26 32 26 60 C26 90 54 126 88 150 C66 124 40 92 40 62 C40 38 56 22 78 22 C91 22 100 28 105 34 C103 26 93 14 78 14 Z"
+              fill="url(#heartSheen)"
+            />
+
+            {/* Upper Lobe Crest Glow */}
+            <ellipse 
+              cx="72" 
+              cy="30" 
+              rx="26" 
+              ry="11" 
+              transform="rotate(-20 72 30)"
+              fill="url(#innerShine)" 
+            />
           </svg>
         </div>
 
@@ -717,7 +773,7 @@ export default function App() {
                 className={`modal-role-item ${role === 'zenah' ? 'selected' : ''}`}
                 onClick={() => handleSelectRole('zenah')}
               >
-                <span>🌸 Zenah (Wife • Assam)</span>
+                <span>🌸 Zenah (The Wife)</span>
                 {role === 'zenah' && <CheckCircle2 size={18} className="check-icon" />}
               </button>
 
@@ -725,7 +781,7 @@ export default function App() {
                 className={`modal-role-item ${role === 'arnav' ? 'selected' : ''}`}
                 onClick={() => handleSelectRole('arnav')}
               >
-                <span>💍 Arnav (Husband)</span>
+                <span>💍 Arnav (The Husband)</span>
                 {role === 'arnav' && <CheckCircle2 size={18} className="check-icon" />}
               </button>
 

@@ -54,7 +54,10 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: env(safe-area-inset-top, 16px) 20px calc(env(safe-area-inset-bottom, 16px) + 16px);
+  padding-top: max(env(safe-area-inset-top, 20px), 54px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 16px) + 16px);
+  padding-left: 20px;
+  padding-right: 20px;
   position: relative;
   overflow: hidden;
 }
@@ -384,61 +387,85 @@ body {
   width: 100%;
 }
 
-.smart-heart-btn {
-  width: 140px;
-  height: 140px;
-  border-radius: var(--radius-full);
-  background: radial-gradient(circle at 35% 35%, #FF758F 0%, #C92A52 65%, #8B1536 100%);
+.pure-heart-btn {
+  width: 190px;
+  height: 175px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   cursor: pointer;
-  box-shadow: 0 14px 45px var(--rose-glow), inset 0 2px 6px rgba(255, 255, 255, 0.4);
-  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  background: none;
+  border: none;
+  outline: none;
+  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: realistic-heartbeat 2.8s ease-in-out infinite;
   user-select: none;
   -webkit-user-select: none;
 }
 
-.smart-heart-btn:active {
+.pure-heart-btn:active {
   transform: scale(0.92);
 }
 
-.heart-aura-layer {
-  position: absolute;
-  inset: -12px;
-  border-radius: var(--radius-full);
-  background: radial-gradient(circle, var(--rose-glow) 0%, transparent 70%);
-  z-index: 0;
-  animation: aura-breathe 3s ease-in-out infinite;
+.pure-heart-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  position: relative;
+  z-index: 2;
+  transition: filter 0.3s ease;
 }
 
-.heart-svg {
-  width: 64px;
-  height: 64px;
-  color: #FFFFFF;
-  position: relative;
+.heart-ambient-light {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 170px;
+  height: 170px;
+  border-radius: var(--radius-full);
+  background: radial-gradient(circle, rgba(255, 51, 102, 0.45) 0%, rgba(229, 86, 117, 0.2) 45%, transparent 75%);
+  filter: blur(22px);
   z-index: 1;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+  animation: ambient-pulse 2.8s ease-in-out infinite;
 }
 
 .pulse-burst {
-  animation: burst-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: heart-burst 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
 }
 
-.holding-aura {
-  transform: scale(1.08);
-  box-shadow: 0 0 60px rgba(229, 86, 117, 0.8), inset 0 2px 8px rgba(255, 255, 255, 0.6);
+.holding-glow {
+  transform: scale(1.18) !important;
+  animation: none !important;
 }
 
-@keyframes aura-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50% { transform: scale(1.15); opacity: 0.95; }
+.holding-glow .heart-ambient-light {
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(255, 51, 102, 0.75) 0%, rgba(255, 117, 143, 0.45) 50%, transparent 80%);
+  filter: blur(30px);
 }
 
-@keyframes burst-pop {
-  0% { transform: scale(0.88); }
-  50% { transform: scale(1.22); }
+/* Realistic organic double-beat cardiac pulse */
+@keyframes realistic-heartbeat {
+  0% { transform: scale(1); }
+  12% { transform: scale(1.06); }
+  22% { transform: scale(1.02); }
+  34% { transform: scale(1.10); }
+  55% { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+
+@keyframes ambient-pulse {
+  0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
+  34% { opacity: 0.95; transform: translate(-50%, -50%) scale(1.15); }
+}
+
+@keyframes heart-burst {
+  0% { transform: scale(0.9); }
+  45% { transform: scale(1.26); }
   100% { transform: scale(1); }
 }
 
