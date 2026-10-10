@@ -1,5 +1,5 @@
 // BubuLink Service Worker with Seamless Auto-Update & Push
-const CACHE_NAME = 'bubulink-1791628504874';
+const CACHE_NAME = 'bubulink-1791629291748';
 
 self.addEventListener('install', (event) => {
   // Activate immediately without waiting for existing tabs/standalone sessions to close

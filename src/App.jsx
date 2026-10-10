@@ -98,8 +98,9 @@ export default function App() {
 
   const holdTimerRef = useRef(null);
   const isHoldingRef = useRef(false);
+  const heartElemRef = useRef(null);
+  const heartCenterRef = useRef({ x: 0, y: 0 });
   const touchStartPosRef = useRef({ x: 0, y: 0 });
-  const dockElemRef = useRef(null);
   const lastPingIdRef = useRef(null);
   const lastReactionRef = useRef(null);
 
@@ -420,35 +421,42 @@ export default function App() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // ================= APPLE-GRADE SMART GESTURE LOGIC =================
+  // ================= APPLE-GRADE CIRCULAR RADIAL GESTURE =================
   const handleTouchStart = (e) => {
     const touch = e.touches ? e.touches[0] : e;
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
     isHoldingRef.current = false;
 
-    // 240ms threshold for press-and-hold vs tap
+    if (heartElemRef.current) {
+      const rect = heartElemRef.current.getBoundingClientRect();
+      heartCenterRef.current = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+    }
+
+    // 220ms threshold for press-and-hold vs tap
     holdTimerRef.current = setTimeout(() => {
       isHoldingRef.current = true;
       setIsHolding(true);
       setSelectedVibeIndex(0);
       if (navigator.vibrate) navigator.vibrate(35);
-    }, 240);
+    }, 220);
   };
 
   const handleTouchMove = (e) => {
     if (!isHoldingRef.current) return;
 
     const touch = e.touches ? e.touches[0] : e;
-    
-    // Calculate drag progress horizontally across the action ribbon
-    if (dockElemRef.current) {
-      const rect = dockElemRef.current.getBoundingClientRect();
-      const relativeX = touch.clientX - rect.left;
-      const progress = Math.max(0, Math.min(1, relativeX / rect.width));
-      const targetIndex = Math.min(
-        VIBE_OPTIONS.length - 1,
-        Math.floor(progress * VIBE_OPTIONS.length)
-      );
+    const dx = touch.clientX - heartCenterRef.current.x;
+    const dy = touch.clientY - heartCenterRef.current.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    // If dragged away from direct center, determine radial slice
+    if (dist > 25) {
+      const deg = (Math.atan2(dy, dx) * 180) / Math.PI; // -180 to 180
+      const normalized = (deg + 90 + 360) % 360; // 0 is top (-90deg)
+      const targetIndex = Math.round(normalized / 60) % 6;
 
       if (targetIndex !== selectedVibeIndex) {
         setSelectedVibeIndex(targetIndex);
@@ -668,14 +676,14 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= CENTER STAGE: SCULPTED 3D HEART & ACTION DOCK ================= */}
+      {/* ================= CENTER STAGE: SCULPTED 3D HEART & CIRCULAR RADIAL RING ================= */}
       <div className="center-stage">
         
-        {/* Apple Smart Action Ribbon (Blooms UPWARD above the heart into open space!) */}
+        {/* Apple Circular Radial Vibe Ring & Preview Card */}
         {isHolding && (
-          <div className="action-dock-container animate-spring-up">
-            {/* Live Message Preview Card */}
-            <div className="vibe-preview-card">
+          <>
+            {/* Live Message Preview Card (Floats above the circular ring) */}
+            <div className="radial-preview-card animate-spring-up">
               <span className="preview-emoji">{activeVibe.emoji}</span>
               <div className="preview-text-block">
                 <strong>{activeVibe.label}</strong>
@@ -683,26 +691,38 @@ export default function App() {
               </div>
             </div>
 
-            {/* Glowing Frosted Glass Action Ribbon */}
-            <div ref={dockElemRef} className="action-dock-bar">
+            {/* Circular Orbiting Vibe Halo */}
+            <div className="radial-orbit-ring">
               {VIBE_OPTIONS.map((v, i) => {
                 const isTargeted = selectedVibeIndex === i;
+                const angleDeg = i * 60 - 90;
+                const angleRad = (angleDeg * Math.PI) / 180;
+                const radius = 138;
+                const x = Math.round(radius * Math.cos(angleRad));
+                const y = Math.round(radius * Math.sin(angleRad));
+
                 return (
                   <div
                     key={v.id}
-                    className={`dock-vibe-item ${isTargeted ? 'targeted' : ''}`}
+                    className={`radial-vibe-orb ${isTargeted ? 'targeted' : ''}`}
+                    style={{
+                      transform: `translate(${x}px, ${y}px) scale(${isTargeted ? 1.36 : 1})`,
+                    }}
                   >
-                    <span className="dock-emoji">{v.emoji}</span>
+                    <span className="radial-emoji">{v.emoji}</span>
+                    {isTargeted && <div className="radial-target-halo"></div>}
                   </div>
                 );
               })}
             </div>
-            <div className="dock-drag-hint">Slide finger across • Release to send</div>
-          </div>
+
+            <div className="radial-drag-hint">Rotate thumb to select • Release to send</div>
+          </>
         )}
 
         {/* The Sculpted 3D Glowing Living Heart */}
         <div
+          ref={heartElemRef}
           className={`pure-heart-btn ${heartPulsing ? 'pulse-burst' : ''} ${isHolding ? 'holding-glow' : ''}`}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
